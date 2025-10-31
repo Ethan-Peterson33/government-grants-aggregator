@@ -125,27 +125,20 @@ export async function getGrantByShortId(short: string): Promise<Grant | null> {
   const target = short.trim().toLowerCase();
   if (!target) return null;
 
-  for (const table of TABLE_FALLBACK_ORDER) {
-    const { data, error } = (await supabase
-      .from(table)
-      .select("*")
-      .order("scraped_at", { ascending: false })
-      .limit(100)) as unknown as {
-      data: Grant[] | null;
-      error: PostgrestError | null;
-    };
+  // short === first UUID segment; match "short-%"
+  const { data, error } = await supabase
+    .from("grants")
+    .select("*")
+    .ilike("id", `${target}-%`)   // case-insensitive prefix match
+    .order("scraped_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-    if (error) {
-      console.error("❌ getGrantByShortId error:", error);
-      continue;
-    }
-
-    const grants = data ?? [];
-    const match = grants.find((grant) => shortId(grant.id) === target);
-    if (match) return match;
+  if (error) {
+    console.error("❌ getGrantByShortId error:", error);
+    return null;
   }
-
-  return null;
+  return data ?? null;
 }
 
 export async function getFacetSets(): Promise<FacetSets> {

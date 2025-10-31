@@ -3,9 +3,9 @@ import "./globals.css";
 import { ReactNode } from "react";
 import Link from "next/link";
 
-const siteName = "GovCareers";
+const siteName = "GovGrants";
 const description =
-  "Discover the latest federal, state, and municipal government jobs with tailored filters for your location.";
+  "Discover federal, state, and local government grants with tailored filters for agency, category, and location.";
 
 export const metadata: Metadata = {
   title: {
@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   },
   description,
   keywords: [
-    "government jobs",
-    "civil service",
-    "public sector careers",
-    "state jobs",
-    "federal jobs",
+    "government grants",
+    "public funding",
+    "grant opportunities",
+    "state grants",
+    "federal grants",
   ],
   metadataBase: new URL("https://example.com"),
   openGraph: {
@@ -50,11 +50,11 @@ export default function RootLayout({
               <Link href="/" className="text-xl font-semibold text-slate-900">
                 {siteName}
               </Link>
-              <p className="text-sm text-slate-600">Public sector careers, in one place.</p>
+              <p className="text-sm text-slate-600">Government funding opportunities, in one place.</p>
             </div>
             <nav className="hidden gap-6 text-sm font-medium text-slate-700 sm:flex">
-              <Link className="hover:text-slate-900" href="/jobs">
-                Find Jobs
+              <Link className="hover:text-slate-900" href="/grants">
+                Find Grants
               </Link>
               <Link className="hover:text-slate-900" href="/about">
                 About

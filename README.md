@@ -153,3 +153,125 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
+
+
+
+schema:
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.grant_categories (
+  category_code text NOT NULL,
+  category_label text NOT NULL,
+  scraped boolean NOT NULL DEFAULT false,
+  last_fetch_date timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT grant_categories_pkey PRIMARY KEY (category_code)
+);
+CREATE TABLE public.grant_scrape_sources (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  url text NOT NULL,
+  active boolean DEFAULT true,
+  last_scraped_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  query text,
+  selectors jsonb,
+  last_page_scraped integer DEFAULT 0,
+  CONSTRAINT grant_scrape_sources_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.grants (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  source_id uuid,
+  title text NOT NULL,
+  apply_link text,
+  agency text,
+  amount text,
+  deadline text,
+  eligibility text,
+  category text,
+  state text,
+  summary text,
+  scraped_at timestamp with time zone NOT NULL DEFAULT now(),
+  hash text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  description text,
+  details_scraped_at timestamp with time zone,
+  details_error text,
+  status text,
+  summary_auto text,
+  summary_model text,
+  summary_updated_at timestamp with time zone,
+  description_hash text,
+  notice_id text,
+  solicitation_number text,
+  full_parent_path_name text,
+  full_parent_path_code text,
+  posted_date date,
+  type text,
+  base_type text,
+  archive_type text,
+  archive_date date,
+  set_aside_code text,
+  response_deadline timestamp with time zone,
+  naics_code text,
+  classification_code text,
+  active boolean,
+  description_url text,
+  ui_link text,
+  award_amount numeric,
+  award_number text,
+  awardee_name text,
+  agency_code text,
+  open_date date,
+  close_date date,
+  source text,
+  agency_name text,
+  opportunity_number text UNIQUE,
+  category_code text,
+  opportunity_id integer,
+  CONSTRAINT grants_pkey PRIMARY KEY (id),
+  CONSTRAINT grants_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.grant_scrape_sources(id)
+);
+CREATE TABLE public.jobs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  source_id uuid,
+  title text,
+  apply_link text,
+  category text,
+  employment_type text,
+  location text,
+  closing_at text,
+  department text,
+  salary text,
+  scraped_at timestamp with time zone NOT NULL DEFAULT now(),
+  hash text,
+  state text,
+  CONSTRAINT jobs_pkey PRIMARY KEY (id),
+  CONSTRAINT jobs_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.scrape_sources(id)
+);
+CREATE TABLE public.scrape_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  source_id uuid,
+  status text NOT NULL CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'done'::text, 'failed'::text])),
+  message text,
+  started_at timestamp with time zone DEFAULT now(),
+  finished_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT scrape_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT scrape_logs_source_id_fkey FOREIGN KEY (source_id) REFERENCES public.scrape_sources(id)
+);
+CREATE TABLE public.scrape_sources (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  url text NOT NULL,
+  active boolean DEFAULT true,
+  last_scraped_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  query text,
+  selectors jsonb,
+  CONSTRAINT scrape_sources_pkey PRIMARY KEY (id)
+);

@@ -1,36 +1,37 @@
-export type Job = {
+export type Grant = {
   id: string;
-  source_id: string | null;
   title: string;
   apply_link: string | null;
   category: string | null;
-  employment_type: string | null;
-  location: string | null;
-  closing_at: string | null;
-  department: string | null;
-  salary: string | null;
-  scraped_at: string | null;
-  hash: string | null;
+  agency: string | null;
+  funding_amount: string | null;
+  eligibility: string | null;
+  deadline: string | null;
+  state: string | null;
+  city: string | null;
+  summary: string | null;
+  description: string | null;
+  scraped_at: string;
+  opportunity_number?: string | null;
+  opportunity_id?: number | null;
+  agency_code?: string | null;
+  open_date?: string | null;
+  close_date?: string | null;
 };
 
-export type JobWithLocation = Job & {
-  state?: string | null;
-  city?: string | null;
-};
-
-export type JobFilters = {
+export type GrantFilters = {
   query?: string;
-  location?: string;
   category?: string;
-  type?: string;
   state?: string;
+  city?: string;
+  agency?: string;
+  hasApplyLink?: boolean;
   page?: number;
   pageSize?: number;
 };
 
 export type FacetSets = {
   categories: string[];
-  locations: string[];
-  employmentTypes: string[];
   states: string[];
+  agencies: string[];
 };

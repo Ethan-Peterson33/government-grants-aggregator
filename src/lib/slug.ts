@@ -1,4 +1,4 @@
-import type { JobWithLocation } from "@/lib/types";
+import type { Grant } from "@/lib/types";
 
 export function slug(input: string): string {
   return input
@@ -13,23 +13,23 @@ export function shortId(id: string): string {
   return id.replace(/[^a-z0-9]/gi, "").slice(0, 8).toLowerCase();
 }
 
-export function buildJobPath(job: JobWithLocation): string {
-  const segments: string[] = ["jobs"];
+export function buildGrantPath(grant: Pick<Grant, "id" | "title" | "category" | "state"> & {
+  city?: string | null;
+}): string {
+  const segments: string[] = ["grants"];
 
-  if (job.state) {
-    segments.push(slug(job.state));
-  }
+  const category = grant.category || "general";
+  const state = grant.state || "us";
 
-  if (job.city) {
-    segments.push(slug(job.city));
-  }
+  segments.push(slug(state));
 
-  if (job.category) {
-    segments.push(slug(job.category));
-  }
+  const citySegment = grant.city ? slug(grant.city) : "statewide";
+  segments.push(citySegment);
 
-  const jobSlug = `${slug(job.title)}-${shortId(job.id)}`;
-  segments.push(jobSlug);
+  segments.push(slug(category));
+
+  const grantSlug = `${slug(grant.title)}-${shortId(grant.id)}`;
+  segments.push(grantSlug);
 
   return `/${segments.join("/")}`;
 }

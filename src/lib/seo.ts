@@ -1,5 +1,5 @@
-import { buildJobPath } from "@/lib/slug";
-import type { Job, JobWithLocation } from "@/lib/types";
+import { buildGrantPath } from "@/lib/slug";
+import type { Grant } from "@/lib/types";
 
 type BreadcrumbItem = {
   name: string;
@@ -8,79 +8,57 @@ type BreadcrumbItem = {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://example.com";
 
-export function generateJobJsonLd(job: Job, options?: { path?: string }) {
-  const jobPath = options?.path ?? `${buildJobPath(job)}?id=${encodeURIComponent(job.id)}`;
-  const jobUrl = `${SITE_URL}${jobPath}`;
-  const jobPosting: Record<string, unknown> = {
+export function generateGrantJsonLd(grant: Grant, options?: { path?: string }) {
+  const grantPath = options?.path ?? `${buildGrantPath(grant)}?id=${encodeURIComponent(grant.id)}`;
+  const grantUrl = `${SITE_URL}${grantPath}`;
+  const plainDescription = grant.description
+    ? grant.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || undefined
+    : undefined;
+  const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
-    "@type": "JobPosting",
-    title: job.title,
-    datePosted: job.scraped_at ?? undefined,
-    validThrough: job.closing_at ?? undefined,
-    employmentType: job.employment_type ?? undefined,
-    hiringOrganization: job.department
+    "@type": "Grant",
+    name: grant.title,
+    description: grant.summary ?? plainDescription,
+    url: grantUrl,
+    applicationStartDate: grant.open_date ?? undefined,
+    applicationDeadline: grant.deadline ?? grant.close_date ?? undefined,
+    sponsor: grant.agency
       ? {
           "@type": "Organization",
-          name: job.department,
+          name: grant.agency,
         }
       : undefined,
-    jobLocation: job.location
+    applicantLocationRequirements: grant.state ?? undefined,
+    fundingScheme: grant.category ?? undefined,
+    offers: grant.funding_amount
       ? {
-          "@type": "Place",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: job.location,
-          },
+          "@type": "Offer",
+          description: grant.funding_amount,
         }
       : undefined,
-    identifier: {
-      "@type": "PropertyValue",
-      name: job.department ?? undefined,
-      value: job.id,
-    },
-    description: job.department
-      ? `${job.title} role with ${job.department}${job.location ? ` in ${job.location}` : ""}.`
-      : `${job.title}${job.location ? ` in ${job.location}` : ""}.`,
-    baseSalary: job.salary
-      ? {
-          "@type": "MonetaryAmount",
-          currency: "USD",
-          value: {
-            "@type": "QuantitativeValue",
-            value: job.salary,
-          },
-        }
-      : undefined,
-    directApply: Boolean(job.apply_link),
-    applicationContact: job.apply_link
-      ? {
-          "@type": "ContactPoint",
-          url: job.apply_link,
-        }
-      : undefined,
-    url: jobUrl,
+    mainEntityOfPage: grantUrl,
   };
 
-  Object.keys(jobPosting).forEach((key) => {
-    if (jobPosting[key] === undefined) {
-      delete jobPosting[key];
+  Object.keys(jsonLd).forEach((key) => {
+    if (jsonLd[key] === undefined) {
+      delete jsonLd[key];
     }
   });
 
-  return jobPosting;
+  return jsonLd;
 }
 
-export function generateItemListJsonLd(jobs: JobWithLocation[]) {
+export function generateItemListJsonLd(grants: Grant[]) {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
     itemListOrder: "https://schema.org/ItemListOrderDescending",
-    numberOfItems: jobs.length,
-    itemListElement: jobs.map((job, index) => ({
+    numberOfItems: grants.length,
+    itemListElement: grants.map((grant, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      name: job.title,
-      url: `${SITE_URL}${buildJobPath(job)}?id=${encodeURIComponent(job.id)}`,
+      name: grant.title,
+      url: `${SITE_URL}${buildGrantPath(grant)}?id=${encodeURIComponent(grant.id)}`,
     })),
   };
 }

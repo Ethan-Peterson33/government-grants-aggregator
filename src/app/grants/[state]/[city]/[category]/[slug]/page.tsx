@@ -29,28 +29,35 @@ export async function generateMetadata({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-const rawId = searchParams?.id;
-const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
-const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
+  console.log("🧭 [generateMetadata] params:", params, "searchParams:", searchParams);
 
-const slugShort = extractShortIdFromSlug(params.slug);
-let grant: Grant | null = null;
+  const rawId = searchParams?.id;
+  const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
 
-  if (paramId) {
-    grant = await getGrantById(paramId);
+  const slugShort = extractShortIdFromSlug(params.slug);
+  console.log("🔍 [generateMetadata] grantId:", grantId, "slugShort:", slugShort);
+
+  let grant: Grant | null = null;
+
+  if (grantId) {
+    grant = await getGrantById(grantId);
+    console.log("📄 [generateMetadata] getGrantById result:", grant?.id);
   } else if (slugShort) {
     grant = await getGrantByShortId(slugShort);
+    console.log("📄 [generateMetadata] getGrantByShortId result:", grant?.id);
   }
 
   if (!isGrant(grant)) {
+    console.warn("⚠️ [generateMetadata] Grant not found for:", { grantId, slugShort });
     return {
       title: "Grant Not Found",
       description: "The requested grant could not be located. Explore additional funding opportunities.",
     };
   }
 
-  // grant is guaranteed to have id/title by isGrant
   const canonical = grantPath(grant);
+  console.log("✅ [generateMetadata] Canonical path:", canonical);
 
   const stateName = sentenceCase(params.state);
   const cityName = sentenceCase(params.city);
@@ -75,20 +82,31 @@ export default async function GrantDetailPage({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-const rawId = searchParams?.id;
-const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
-const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
+  console.log("🧭 [GrantDetailPage] params:", params, "searchParams:", searchParams);
 
-const slugShort = extractShortIdFromSlug(params.slug);
-let grant: Grant | null = null;
+  const rawId = searchParams?.id;
+  const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
 
-  if (paramId) {
-    grant = await getGrantById(paramId);
-  } else if (slugShort) {
-    grant = await getGrantByShortId(slugShort);
+  const slugShort = extractShortIdFromSlug(params.slug);
+  console.log("🔍 [GrantDetailPage] grantId:", grantId, "slugShort:", slugShort);
+
+  let grant: Grant | null = null;
+
+  try {
+    if (grantId) {
+      grant = await getGrantById(grantId);
+      console.log("📄 [GrantDetailPage] getGrantById result:", grant?.id);
+    } else if (slugShort) {
+      grant = await getGrantByShortId(slugShort);
+      console.log("📄 [GrantDetailPage] getGrantByShortId result:", grant?.id);
+    }
+  } catch (err) {
+    console.error("❌ [GrantDetailPage] Error fetching grant:", err);
   }
 
   if (!isGrant(grant)) {
+    console.warn("⚠️ [GrantDetailPage] Grant not found, redirecting to 404");
     notFound();
   }
 
@@ -97,8 +115,10 @@ let grant: Grant | null = null;
     paramId ? `?id=${encodeURIComponent(paramId)}` : ""
   }`;
 
-  // Canonicalize route if mismatched
+  console.log("🧩 [GrantDetailPage] canonical:", canonical, "current:", current);
+
   if (current !== canonical) {
+    console.log("↩️ [GrantDetailPage] Redirecting to canonical");
     redirect(canonical);
   }
 

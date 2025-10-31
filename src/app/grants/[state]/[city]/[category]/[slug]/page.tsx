@@ -10,10 +10,6 @@ import type { Grant } from "@/lib/types";
 import { grantPath } from "@/lib/slug";
 import { sentenceCase } from "@/lib/utils";
 
-// ---------------------------
-// Utility helpers
-// ---------------------------
-
 function extractShortIdFromSlug(slug: string | undefined | null): string | null {
   if (!slug || typeof slug !== "string") return null;
   const last = slug.split("-").at(-1);
@@ -27,21 +23,27 @@ function isGrant(value: unknown): value is Grant {
 }
 
 // ---------------------------
-// Metadata generation
+// generateMetadata
 // ---------------------------
 
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { state: string; city: string; category: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ state: string; city: string; category: string; slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const rawId = searchParams?.id;
+  const resolvedParams = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
+
+  console.log("🧭 [generateMetadata] resolvedParams:", resolvedParams);
+  console.log("🧭 [generateMetadata] resolvedSearchParams:", resolvedSearchParams);
+
+  const rawId = resolvedSearchParams?.id;
   const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
   const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
 
-  const slugShort = extractShortIdFromSlug(params.slug);
+  const slugShort = extractShortIdFromSlug(resolvedParams.slug);
   console.log("🔍 [generateMetadata] grantId:", grantId, "slugShort:", slugShort);
 
   let grant: Grant | null = null;
@@ -58,16 +60,17 @@ export async function generateMetadata({
     console.warn("⚠️ [generateMetadata] Grant not found for:", { grantId, slugShort });
     return {
       title: "Grant Not Found",
-      description: "The requested grant could not be located. Explore additional funding opportunities.",
+      description:
+        "The requested grant could not be located. Explore additional funding opportunities.",
     };
   }
 
   const canonical = grantPath(grant);
   console.log("✅ [generateMetadata] Canonical path:", canonical);
 
-  const stateName = sentenceCase(params.state);
-  const cityName = sentenceCase(params.city);
-  const categoryName = sentenceCase(params.category);
+  const stateName = sentenceCase(resolvedParams.state);
+  const cityName = sentenceCase(resolvedParams.city);
+  const categoryName = sentenceCase(resolvedParams.category);
 
   return {
     title: `${grant.title} | ${categoryName} grant in ${cityName}, ${stateName}`,
@@ -82,9 +85,8 @@ export async function generateMetadata({
 }
 
 // ---------------------------
-// Main Page Component
+// Page Component
 // ---------------------------
-
 
 export default async function GrantDetailPage({
   params,
@@ -126,7 +128,7 @@ export default async function GrantDetailPage({
   }
 
   const canonical = grantPath(grant);
-  const current = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}${
+  const current = `/grants/${resolvedParams.state}/${resolvedParams.city}/${resolvedParams.category}/${resolvedParams.slug}${
     paramId ? `?id=${encodeURIComponent(paramId)}` : ""
   }`;
 
@@ -137,32 +139,57 @@ export default async function GrantDetailPage({
     redirect(canonical);
   }
 
-  const stateName = sentenceCase(params.state);
-  const cityName = sentenceCase(params.city);
-  const categoryName = sentenceCase(params.category);
+  const stateName = sentenceCase(resolvedParams.state);
+  const cityName = sentenceCase(resolvedParams.city);
+  const categoryName = sentenceCase(resolvedParams.category);
   const detailPath = canonical;
 
   const [categoryRelated, stateRelated] = await Promise.all([
     grant.category && grant.state
       ? searchGrants({ state: grant.state, category: grant.category, page: 1, pageSize: 6 })
-      : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
+      : Promise.resolve({
+          grants: [] as Grant[],
+          total: 0,
+          page: 1,
+          pageSize: 6,
+          totalPages: 0,
+        }),
     grant.state
       ? searchGrants({ state: grant.state, page: 1, pageSize: 6 })
-      : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
+      : Promise.resolve({
+          grants: [] as Grant[],
+          total: 0,
+          page: 1,
+          pageSize: 6,
+          totalPages: 0,
+        }),
   ]);
 
-  const moreCategory = (categoryRelated.grants ?? []).filter((g) => g.id !== grant.id).slice(0, 6);
-  const moreState = (stateRelated.grants ?? []).filter((g) => g.id !== grant.id).slice(0, 6);
+  const moreCategory = (categoryRelated.grants ?? [])
+    .filter((g) => g.id !== grant.id)
+    .slice(0, 6);
+  const moreState = (stateRelated.grants ?? [])
+    .filter((g) => g.id !== grant.id)
+    .slice(0, 6);
 
   const relatedLinks = [
     grant.category
-      ? { label: `More ${grant.category} grants`, href: `/grants?category=${encodeURIComponent(grant.category)}` }
+      ? {
+          label: `More ${grant.category} grants`,
+          href: `/grants?category=${encodeURIComponent(grant.category)}`,
+        }
       : null,
     grant.state
-      ? { label: `Funding in ${grant.state}`, href: `/grants?state=${encodeURIComponent(grant.state)}` }
+      ? {
+          label: `Funding in ${grant.state}`,
+          href: `/grants?state=${encodeURIComponent(grant.state)}`,
+        }
       : null,
     grant.agency
-      ? { label: `Programs from ${grant.agency}`, href: `/grants?agency=${encodeURIComponent(grant.agency)}` }
+      ? {
+          label: `Programs from ${grant.agency}`,
+          href: `/grants?agency=${encodeURIComponent(grant.agency)}`,
+        }
       : null,
   ].filter((x): x is { label: string; href: string } => Boolean(x));
 
@@ -174,17 +201,23 @@ export default async function GrantDetailPage({
         items={[
           { label: "Home", href: "/" },
           { label: "Grants", href: "/grants" },
-          { label: stateName, href: `/grants/${params.state}` },
-          { label: cityName, href: `/grants/${params.state}/${params.city}` },
-          { label: categoryName, href: `/grants/${params.state}/${params.city}/${params.category}` },
+          { label: stateName, href: `/grants/${resolvedParams.state}` },
+          { label: cityName, href: `/grants/${resolvedParams.state}/${resolvedParams.city}` },
+          {
+            label: categoryName,
+            href: `/grants/${resolvedParams.state}/${resolvedParams.city}/${resolvedParams.category}`,
+          },
           { label: grant.title, href: detailPath },
         ]}
       />
+
       <GrantDetail grant={grant} />
 
       {moreCategory.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-slate-900">More {categoryName} grants</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            More {categoryName} grants
+          </h2>
           <div className="grid gap-4 md:grid-cols-2">
             {moreCategory.map((item) => (
               <GrantCard key={item.id} grant={item} />
@@ -195,7 +228,9 @@ export default async function GrantDetailPage({
 
       {moreState.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-slate-900">Additional grants in {stateName}</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            Additional grants in {stateName}
+          </h2>
           <div className="grid gap-4 md:grid-cols-2">
             {moreState.map((item) => (
               <GrantCard key={item.id} grant={item} />
@@ -214,9 +249,12 @@ export default async function GrantDetailPage({
             generateBreadcrumbJsonLd([
               { name: "Home", url: "/" },
               { name: "Grants", url: "/grants" },
-              { name: stateName, url: `/grants/${params.state}` },
-              { name: cityName, url: `/grants/${params.state}/${params.city}` },
-              { name: categoryName, url: `/grants/${params.state}/${params.city}/${params.category}` },
+              { name: stateName, url: `/grants/${resolvedParams.state}` },
+              { name: cityName, url: `/grants/${resolvedParams.state}/${resolvedParams.city}` },
+              {
+                name: categoryName,
+                url: `/grants/${resolvedParams.state}/${resolvedParams.city}/${resolvedParams.category}`,
+              },
               { name: grant.title, url: detailPath },
             ]),
             grantJsonLd,

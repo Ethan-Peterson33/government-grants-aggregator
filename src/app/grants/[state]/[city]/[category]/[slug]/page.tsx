@@ -10,6 +10,10 @@ import type { Grant } from "@/lib/types";
 import { grantPath } from "@/lib/slug";
 import { sentenceCase } from "@/lib/utils";
 
+// ---------------------------
+// Utility helpers
+// ---------------------------
+
 function extractShortIdFromSlug(slug: string | undefined | null): string | null {
   if (!slug || typeof slug !== "string") return null;
   const last = slug.split("-").at(-1);
@@ -22,23 +26,24 @@ function isGrant(value: unknown): value is Grant {
   return typeof record.id === "string" && typeof record.title === "string";
 }
 
+// ---------------------------
+// Metadata generation
+// ---------------------------
+
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: Promise<{ state: string; city: string; category: string; slug: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  params: { state: string; city: string; category: string; slug: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const resolvedSearchParams = (await searchParams) ?? {};
+  console.log("🧭 [generateMetadata] params:", params, "searchParams:", searchParams);
 
-  console.log("🧭 [generateMetadata] resolvedParams:", resolvedParams, "resolvedSearchParams:", resolvedSearchParams);
-
-  const rawId = resolvedSearchParams?.id;
+  const rawId = searchParams?.id;
   const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
   const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
 
-  const slugShort = extractShortIdFromSlug(resolvedParams.slug);
+  const slugShort = extractShortIdFromSlug(params.slug);
   console.log("🔍 [generateMetadata] grantId:", grantId, "slugShort:", slugShort);
 
   let grant: Grant | null = null;
@@ -62,10 +67,76 @@ export async function generateMetadata({
   const canonical = grantPath(grant);
   console.log("✅ [generateMetadata] Canonical path:", canonical);
 
-  const stateName = sentenceCase(resolvedParams.state);
-  const cityName = sentenceCase(resolvedParams.city);
-  const categoryName = sentenceCase(resolvedParams.category);
+  const stateName = sentenceCase(params.state);
+  const cityName = sentenceCase(params.city);
+  const categoryName = sentenceCase(params.category);
 
+  return {
+    title: `${grant.title} | ${categoryName} grant in ${cityName}, ${stateName}`,
+    description: grant.summary ?? undefined,
+    alternates: { canonical },
+    openGraph: {
+      title: grant.title,
+      description: grant.summary ?? undefined,
+      type: "article",
+    },
+  };
+}
+
+// ---------------------------
+// Main Page Component
+// ---------------------------
+
+export default async function GrantDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { state: string; city: string; category: string; slug: string };
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
+  console.log("🧭 [GrantDetailPage] params:", params, "searchParams:", searchParams);
+
+  const rawId = searchParams?.id;
+  const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
+  const slugShort = extractShortIdFromSlug(params.slug);
+
+  console.log("🔍 [GrantDetailPage] grantId:", grantId, "slugShort:", slugShort);
+
+  let grant: Grant | null = null;
+
+  try {
+    if (grantId) {
+      grant = await getGrantById(grantId);
+      console.log("📄 [GrantDetailPage] getGrantById result:", grant?.id);
+    } else if (slugShort) {
+      grant = await getGrantByShortId(slugShort);
+      console.log("📄 [GrantDetailPage] getGrantByShortId result:", grant?.id);
+    }
+  } catch (err) {
+    console.error("❌ [GrantDetailPage] Error fetching grant:", err);
+  }
+
+  if (!isGrant(grant)) {
+    console.warn("⚠️ [GrantDetailPage] Grant not found, redirecting to 404");
+    notFound();
+  }
+
+  const canonical = grantPath(grant);
+  const current = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}${
+    paramId ? `?id=${encodeURIComponent(paramId)}` : ""
+  }`;
+
+  console.log("🧩 [GrantDetailPage] canonical:", canonical, "current:", current);
+
+  if (current !== canonical) {
+    console.log("↩️ [GrantDetailPage] Redirecting to canonical");
+    redirect(canonical);
+  }
+
+  const stateName = sentenceCase(params.state);
+  const cityName = sentenceCase(params.city);
+  const categoryName = sentenceCase(params.category);
   const detailPath = canonical;
 
   const [categoryRelated, stateRelated] = await Promise.all([
@@ -84,7 +155,9 @@ export async function generateMetadata({
     grant.category
       ? { label: `More ${grant.category} grants`, href: `/grants?category=${encodeURIComponent(grant.category)}` }
       : null,
-    grant.state ? { label: `Funding in ${grant.state}`, href: `/grants?state=${encodeURIComponent(grant.state)}` } : null,
+    grant.state
+      ? { label: `Funding in ${grant.state}`, href: `/grants?state=${encodeURIComponent(grant.state)}` }
+      : null,
     grant.agency
       ? { label: `Programs from ${grant.agency}`, href: `/grants?agency=${encodeURIComponent(grant.agency)}` }
       : null,

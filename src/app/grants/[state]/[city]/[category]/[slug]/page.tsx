@@ -37,8 +37,6 @@ export async function generateMetadata({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  console.log("🧭 [generateMetadata] params:", params, "searchParams:", searchParams);
-
   const rawId = searchParams?.id;
   const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
   const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
@@ -86,6 +84,7 @@ export async function generateMetadata({
 // ---------------------------
 // Main Page Component
 // ---------------------------
+
 
 export default async function GrantDetailPage({
   params,

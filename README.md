@@ -1,172 +1,155 @@
-src/
- ├── app/
- │    ├── layout.tsx
- │    ├── page.tsx                     # homepage /jobs overview
- │    ├── jobs/
- │    │    ├── page.tsx                # /jobs?query=&category=&location=
- │    │    ├── [state]/page.tsx        # /jobs/va
- │    │    ├── [state]/[city]/page.tsx # /jobs/va/richmond
- │    │    ├── [state]/[city]/[category]/page.tsx
- │    │    └── [state]/[city]/[category]/[slug]/page.tsx  # job detail
- │    └── api/
- │         └── revalidate/route.ts     # optional ISR trigger
- │
- ├── components/
- │    ├── filters/FiltersBar.tsx
- │    ├── jobs/JobCard.tsx
- │    ├── jobs/JobDetail.tsx
- │    ├── jobs/RelatedLinks.tsx
- │    ├── Pagination.tsx
- │    ├── Breadcrumbs.tsx
- │    └── ui/*                         # shadcn components
- │
- ├── lib/
- │    ├── supabase/client.ts
- │    ├── supabase/server.ts
- │    ├── types.ts
- │    ├── search.ts
- │    ├── slug.ts                      # keyworded URLs
- │    ├── seo.ts                       # JSON-LD & meta helpers
- │    └── utils.ts
- │
- └── styles/globals.css
+🏛️ Government Grants Portal
 
+A Next.js + Supabase–powered, SEO-optimized grant discovery platform for public, private, and nonprofit funding opportunities.
 
-🏛️ Government Jobs Portal
-A Next.js + Supabase–powered, SEO-optimized job board for public sector careers
 📖 Project Description
 
-The Government Jobs Portal is a modern, open-source job aggregation and discovery platform designed to make government career listings accessible, searchable, and indexable by both users and search engines.
+The Government Grants Portal is a modern, open-source grant aggregation and discovery system designed to make funding opportunities accessible, searchable, and indexable by both users and search engines.
 
-Built with Next.js 15, Supabase, and Edge Functions, the portal automatically scrapes official government job listings (such as from the Virginia Jobs Network and other state or federal portals) and organizes them into a structured, searchable database.
+Built with Next.js 15, Supabase, and Edge Functions, the platform automatically scrapes official government and verified funding websites (e.g., Grants.gov, USGrants.org, state programs) and organizes the data into a structured, searchable database.
 
-It focuses on transparency, accessibility, and performance — surfacing real-time, structured data in a user-friendly interface optimized for SEO and discoverability.
+It focuses on transparency, accessibility, and performance — surfacing real-time structured data in a user-friendly interface optimized for SEO and discoverability.
 
-This project demonstrates a full end-to-end data pipeline:
+🧩 End-to-End Data Pipeline
+🕸️ Scraping Layer (Supabase Edge Functions)
 
-Scraping Layer (Supabase Edge Functions)
-Automated functions fetch job postings daily, clean and structure the data, and store them in Supabase.
-The design supports multiple sources through stored CSS selectors and extraction logic, making it easy to onboard new state or agency websites.
+Automated functions fetch and refresh grant data daily.
+Each source’s configuration stores its own CSS selectors and extraction logic, allowing rapid onboarding of new agencies, states, or organizations.
 
-Storage Layer (Supabase Database)
-Parsed job postings are stored in a normalized schema (jobs, scrape_sources, and scrape_logs).
-Deduplication and hashing ensure daily updates without repetition.
-A latest_jobs view provides the most recent unique postings for public queries.
+💾 Storage Layer (Supabase Database)
 
-Presentation Layer (Next.js Frontend)
-A responsive, high-performance frontend allows visitors to browse, search, and filter jobs by category, location, department, or employment type.
-Each posting is given a canonical, keyword-rich URL for maximum SEO impact.
+Parsed grants are stored in a normalized schema (grants, scrape_sources, scrape_logs).
+Deduplication and hashing ensure clean updates.
+Summaries, categories, and opportunity identifiers are enriched by AI and external APIs.
+
+💡 Presentation Layer (Next.js Frontend)
+
+A fast, responsive frontend enables visitors to:
+
+Search and filter grants by category, location, funding type, or department
+
+Read concise summaries and full descriptions
+
+Browse related opportunities by tag or agency
+
+Each posting is assigned a canonical, keyword-rich URL for maximum SEO impact.
 
 🌐 Core Features
 Feature	Description
-🔍 Smart Search & Filters	Real-time filtering by title, location, category, and employment type.
-⚙️ Automated Scraping	Supabase Edge Functions fetch new listings daily and store structured data.
-🧠 SEO-Optimized Routing	Clean URLs like /jobs/virginia/richmond/faculty/creative-services-coordinator-abc123.
-🔗 Internal Linking	Related job and facet links for improved crawlability and UX.
-🧾 Structured Data	Implements schema.org/JobPosting
- and BreadcrumbList JSON-LD for Google Jobs indexing.
-⚡ Server-Side Rendering (SSR)	Pages rendered on the server for performance and SEO.
-💾 Database-Driven Views	Real-time data from Supabase’s latest_jobs view ensures freshness without duplication.
-🧱 Scalable Architecture	Modular scraping and ingestion pipeline for multi-source expansion.
+🔍 Smart Search & Filters	Real-time filtering by title, category, department, or location
+⚙️ Automated Scraping	Supabase Edge Functions fetch and refresh listings daily
+🧠 AI Summarization	OpenAI generates short, human-readable summaries from long descriptions
+🏷️ SEO-Optimized Routing	Clean URLs like /grants/education/california/school-infrastructure-funding-abc123
+🔗 Internal Linking	Related grants by agency, category, and location
+🧾 Structured Data	Implements schema.org/Grant and BreadcrumbList JSON-LD for rich results
+⚡ Server-Side Rendering (SSR)	Lightning-fast load times and optimal crawlability
+🧱 Scalable Architecture	Modular ingestion pipeline for adding new sources
+💬 Summaries & Details	Grants display concise summaries plus full descriptions and official apply links
 🧭 Vision
 
-The goal of this project is to create a centralized, transparent hub for public sector job listings that is:
+Create a centralized, transparent hub for public and private funding opportunities that is:
 
-Easily discoverable through SEO-friendly URLs
+Easily discoverable via SEO-friendly URLs
 
 Continuously updated via automated scraping
 
-Lightweight, modular, and open-source
+Modular, open-source, and easy to extend
 
-It is built to scale — starting with Virginia government jobs and expanding to include regional, federal, and other verified public service postings.
+Starting with U.S. federal and state grants, the system can expand to foundations, universities, and global programs.
 
 🧩 Why This Matters
 
-Government job boards are often fragmented, outdated, or hidden behind poor user interfaces.
-This project bridges that gap by combining the automation of data aggregation with the discoverability of a modern web experience.
+Grant data is scattered across dozens of agency portals and PDFs.
+Most are not indexed well, poorly formatted, or hidden behind complex filters.
 
-By exposing standardized job data with structured metadata and contextual linking, this system:
+This project bridges that gap by combining:
 
-Makes government jobs more visible to the public
+Automation for collection
 
-Improves SEO and traffic for public agencies
+AI for summarization
 
-Demonstrates open data best practices for civic technology
+Modern web architecture for accessibility
 
+By exposing structured data with rich metadata and contextual linking, this system:
 
-🧩 Database Schema
-jobs
-column	type	notes
-id	uuid PK	generated
-source_id	uuid	FK to scrape_sources
-title	text	job title
-apply_link	text	direct URL to job
-category	text	department or field
-employment_type	text	full-time, part-time
-location	text	human-readable location
-state	text	extracted from location
-city	text	extracted from location
-department	text	hiring agency
-salary	text	formatted salary string
-closing_at	text	application deadline
-scraped_at	timestamptz	default now()
-hash	text generated always	`md5(title
-latest_jobs View
-create or replace view latest_jobs as
+Makes funding opportunities more visible
+
+Empowers individuals and organizations to discover new programs
+
+Demonstrates open-data best practices for civic tech and transparency
+
+🧮 Database Schema
+Column	Type	Notes
+id	uuid	PK
+source_id	uuid	FK → scrape_sources
+title	text	Grant title
+apply_link	text	Official grant or application URL
+category	text	e.g., Education, Business, Agriculture
+agency	text	Issuing organization
+funding_amount	text	Formatted amount string
+eligibility	text	Who can apply
+deadline	text	Application due date
+state	text	Extracted from metadata
+city	text	If applicable
+description	text	Full program description (HTML)
+summary	text	AI-generated summary
+summary_model	text	e.g., gpt-3.5-turbo
+summary_updated_at	timestamptz	When last summarized
+scraped_at	timestamptz	Default now()
+hash	text	Generated `md5(title
+
+latest_grants View
+
+create or replace view latest_grants as
 select distinct on (hash) *
-from jobs
+from grants
 order by hash, scraped_at desc;
-
-
 
 🌍 SEO and Routing
 
-Canonical URL Pattern:
+Canonical URL pattern:
+/grants/{category}/{state}/{slug}
 
-/jobs/{state}/{city}/{category}/{job-slug}-{shortid}
+Each page serves structured metadata:
 
+Detail pages → Grant JSON-LD
 
-Each page type serves structured metadata:
+Lists/categories → ItemList JSON-LD
 
-Detail pages → JobPosting JSON-LD
-
-Lists and categories → ItemList JSON-LD
-
-All → BreadcrumbList for internal link hierarchy
+All pages → BreadcrumbList for navigation hierarchy
 
 Example:
-
-/jobs/virginia/richmond/administrative/ph-nurse-6c218708
+/grants/education/california/community-school-funding-6c218708
 
 🔗 Internal Linking
 
-Detail pages link to:
+Each grant detail page links to:
 
-“More jobs in {city}”
+“More grants in {state}”
 
-“More {category} jobs in {state}”
+“More {category} grants”
 
-“More at {department}”
+“More from {agency}”
 
-Category and location pages link to related filters and agencies.
-
-Breadcrumbs mirror the path for every page.
-
-This creates a dense internal link network, boosting crawl depth and ranking signals across the entire domain.
+Category and state pages cross-link to related filters for stronger crawl depth.
+Breadcrumbs mirror the hierarchy for every page, strengthening internal SEO signals.
 
 🧠 Future Enhancements
 
-Add additional state and federal portals
+Add more state, foundation, and nonprofit sources
 
-Implement email job alerts
+Build email “grant alerts” for subscribers
 
-Integrate AI for job summarization
+Expand AI summaries → include eligibility highlights
 
-Add geo-filtering and proximity search
+Implement geo-filtering and proximity search
 
 Track search analytics and trends
 
+Integrate monetization (ads / affiliate / premium alerts)
 
-NEXT_PUBLIC_SUPABASE_URL=<your-url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-service-key>
+🧰 Environment Variables
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=

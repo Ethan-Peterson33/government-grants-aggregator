@@ -1,4 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { shortId } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
@@ -112,6 +113,36 @@ export async function getGrantById(id: string): Promise<Grant | null> {
       break;
     }
     if (data) return data;
+  }
+
+  return null;
+}
+
+export async function getGrantByShortId(short: string): Promise<Grant | null> {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) return null;
+
+  const target = short.trim().toLowerCase();
+  if (!target) return null;
+
+  for (const table of TABLE_FALLBACK_ORDER) {
+    const { data, error } = (await supabase
+      .from(table)
+      .select("*")
+      .order("scraped_at", { ascending: false })
+      .limit(100)) as unknown as {
+      data: Grant[] | null;
+      error: PostgrestError | null;
+    };
+
+    if (error) {
+      console.error("❌ getGrantByShortId error:", error);
+      continue;
+    }
+
+    const grants = data ?? [];
+    const match = grants.find((grant) => shortId(grant.id) === target);
+    if (match) return match;
   }
 
   return null;

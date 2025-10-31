@@ -10,7 +10,8 @@ import type { Grant } from "@/lib/types";
 import { grantPath } from "@/lib/slug";
 import { sentenceCase } from "@/lib/utils";
 
-function extractShortIdFromSlug(slug: string): string | null {
+function extractShortIdFromSlug(slug: string | undefined | null): string | null {
+  if (!slug || typeof slug !== "string") return null;
   const last = slug.split("-").at(-1);
   return last ? last.toLowerCase() : null;
 }
@@ -45,7 +46,9 @@ export async function generateMetadata({
     };
   }
 
+  // grant is guaranteed to have id/title by isGrant
   const canonical = grantPath(grant);
+
   const stateName = sentenceCase(params.state);
   const cityName = sentenceCase(params.city);
   const categoryName = sentenceCase(params.category);
@@ -83,13 +86,12 @@ export default async function GrantDetailPage({
     notFound();
   }
 
-  const resolvedGrant = grant as Grant;
-
-  const canonical = grantPath(resolvedGrant);
+  const canonical = grantPath(grant);
   const current = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}${
     paramId ? `?id=${encodeURIComponent(paramId)}` : ""
   }`;
 
+  // Canonicalize route if mismatched
   if (current !== canonical) {
     redirect(canonical);
   }
@@ -99,58 +101,43 @@ export default async function GrantDetailPage({
   const categoryName = sentenceCase(params.category);
   const detailPath = canonical;
 
-  const breadcrumbItems = [
-    { label: "Home", href: "/" },
-    { label: "Grants", href: "/grants" },
-    { label: stateName, href: `/grants/${params.state}` },
-    { label: cityName, href: `/grants/${params.state}/${params.city}` },
-    { label: categoryName, href: `/grants/${params.state}/${params.city}/${params.category}` },
-    { label: resolvedGrant.title, href: detailPath },
-  ];
-
   const [categoryRelated, stateRelated] = await Promise.all([
-    resolvedGrant.category && resolvedGrant.state
-      ? searchGrants({ state: resolvedGrant.state, category: resolvedGrant.category, page: 1, pageSize: 6 })
+    grant.category && grant.state
+      ? searchGrants({ state: grant.state, category: grant.category, page: 1, pageSize: 6 })
       : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
-    resolvedGrant.state
-      ? searchGrants({ state: resolvedGrant.state, page: 1, pageSize: 6 })
+    grant.state
+      ? searchGrants({ state: grant.state, page: 1, pageSize: 6 })
       : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
   ]);
 
-  const moreCategory = (categoryRelated.grants ?? [])
-    .filter((item) => item.id !== resolvedGrant.id)
-    .slice(0, 6);
-  const moreState = (stateRelated.grants ?? [])
-    .filter((item) => item.id !== resolvedGrant.id)
-    .slice(0, 6);
+  const moreCategory = (categoryRelated.grants ?? []).filter((g) => g.id !== grant.id).slice(0, 6);
+  const moreState = (stateRelated.grants ?? []).filter((g) => g.id !== grant.id).slice(0, 6);
 
   const relatedLinks = [
-    resolvedGrant.category
-      ? {
-          label: `More ${resolvedGrant.category} grants`,
-          href: `/grants?category=${encodeURIComponent(resolvedGrant.category)}`,
-        }
+    grant.category
+      ? { label: `More ${grant.category} grants`, href: `/grants?category=${encodeURIComponent(grant.category)}` }
       : null,
-    resolvedGrant.state
-      ? {
-          label: `Funding in ${resolvedGrant.state}`,
-          href: `/grants?state=${encodeURIComponent(resolvedGrant.state)}`,
-        }
+    grant.state ? { label: `Funding in ${grant.state}`, href: `/grants?state=${encodeURIComponent(grant.state)}` } : null,
+    grant.agency
+      ? { label: `Programs from ${grant.agency}`, href: `/grants?agency=${encodeURIComponent(grant.agency)}` }
       : null,
-    resolvedGrant.agency
-      ? {
-          label: `Programs from ${resolvedGrant.agency}`,
-          href: `/grants?agency=${encodeURIComponent(resolvedGrant.agency)}`,
-        }
-      : null,
-  ].filter((link): link is { label: string; href: string } => Boolean(link));
+  ].filter((x): x is { label: string; href: string } => Boolean(x));
 
-  const grantJsonLd = generateGrantJsonLd(resolvedGrant, { path: detailPath });
+  const grantJsonLd = generateGrantJsonLd(grant, { path: detailPath });
 
   return (
     <div className="container-grid space-y-10 py-10">
-      <Breadcrumb items={breadcrumbItems} />
-      <GrantDetail grant={resolvedGrant} />
+      <Breadcrumb
+        items={[
+          { label: "Home", href: "/" },
+          { label: "Grants", href: "/grants" },
+          { label: stateName, href: `/grants/${params.state}` },
+          { label: cityName, href: `/grants/${params.state}/${params.city}` },
+          { label: categoryName, href: `/grants/${params.state}/${params.city}/${params.category}` },
+          { label: grant.title, href: detailPath },
+        ]}
+      />
+      <GrantDetail grant={grant} />
 
       {moreCategory.length > 0 && (
         <section className="space-y-4">
@@ -181,7 +168,14 @@ export default async function GrantDetailPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+            generateBreadcrumbJsonLd([
+              { name: "Home", url: "/" },
+              { name: "Grants", url: "/grants" },
+              { name: stateName, url: `/grants/${params.state}` },
+              { name: cityName, url: `/grants/${params.state}/${params.city}` },
+              { name: categoryName, url: `/grants/${params.state}/${params.city}/${params.category}` },
+              { name: grant.title, url: detailPath },
+            ]),
             grantJsonLd,
           ]),
         }}

@@ -29,9 +29,12 @@ export async function generateMetadata({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const paramId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
-  const slugShort = extractShortIdFromSlug(params.slug);
-  let grant: Grant | null = null;
+const rawId = searchParams?.id;
+const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
+const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
+
+const slugShort = extractShortIdFromSlug(params.slug);
+let grant: Grant | null = null;
 
   if (paramId) {
     grant = await getGrantById(paramId);
@@ -72,9 +75,12 @@ export default async function GrantDetailPage({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const paramId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
-  const slugShort = extractShortIdFromSlug(params.slug);
-  let grant: Grant | null = null;
+const rawId = searchParams?.id;
+const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
+const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
+
+const slugShort = extractShortIdFromSlug(params.slug);
+let grant: Grant | null = null;
 
   if (paramId) {
     grant = await getGrantById(paramId);

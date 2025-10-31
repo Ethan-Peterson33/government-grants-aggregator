@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { GrantCard } from "@/components/grants/grant-card";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
-import { getGrantById, searchGrants } from "@/lib/search";
+import { getGrantById, getGrantByShortId, searchGrants } from "@/lib/search";
 import type { Grant } from "@/lib/types";
-import { shortId } from "@/lib/slug";
+import { grantPath } from "@/lib/slug";
 import { sentenceCase } from "@/lib/utils";
 
-function extractShortId(slug: string): string | null {
-  const parts = slug.split("-");
-  const last = parts.at(-1);
+function extractShortIdFromSlug(slug: string): string | null {
+  const last = slug.split("-").at(-1);
   return last ? last.toLowerCase() : null;
 }
 
@@ -22,11 +21,6 @@ function isGrant(value: unknown): value is Grant {
   return typeof record.id === "string" && typeof record.title === "string";
 }
 
-function matchesShortId(grant: Pick<Grant, "id">, slug: string): boolean {
-  const segment = extractShortId(slug);
-  return segment ? shortId(grant.id) === segment : false;
-}
-
 export async function generateMetadata({
   params,
   searchParams,
@@ -34,27 +28,32 @@ export async function generateMetadata({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const grantId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
-  const grant = grantId ? await getGrantById(grantId) : null;
+  const paramId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
+  const slugShort = extractShortIdFromSlug(params.slug);
+  let grant: Grant | null = null;
 
-  if (!isGrant(grant) || !matchesShortId(grant, params.slug)) {
+  if (paramId) {
+    grant = await getGrantById(paramId);
+  } else if (slugShort) {
+    grant = await getGrantByShortId(slugShort);
+  }
+
+  if (!isGrant(grant)) {
     return {
       title: "Grant Not Found",
       description: "The requested grant could not be located. Explore additional funding opportunities.",
     };
   }
 
+  const canonical = grantPath(grant);
   const stateName = sentenceCase(params.state);
   const cityName = sentenceCase(params.city);
   const categoryName = sentenceCase(params.category);
-  const detailPath = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}?id=${encodeURIComponent(grant.id)}`;
 
   return {
     title: `${grant.title} | ${categoryName} grant in ${cityName}, ${stateName}`,
     description: grant.summary ?? undefined,
-    alternates: {
-      canonical: detailPath,
-    },
+    alternates: { canonical },
     openGraph: {
       title: grant.title,
       description: grant.summary ?? undefined,
@@ -70,21 +69,35 @@ export default async function GrantDetailPage({
   params: { state: string; city: string; category: string; slug: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const grantId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
-  if (!grantId) {
+  const paramId = typeof searchParams?.id === "string" ? searchParams.id : undefined;
+  const slugShort = extractShortIdFromSlug(params.slug);
+  let grant: Grant | null = null;
+
+  if (paramId) {
+    grant = await getGrantById(paramId);
+  } else if (slugShort) {
+    grant = await getGrantByShortId(slugShort);
+  }
+
+  if (!isGrant(grant)) {
     notFound();
   }
 
-  const grant = await getGrantById(grantId);
+  const resolvedGrant = grant as Grant;
 
-  if (!isGrant(grant) || !matchesShortId(grant, params.slug)) {
-    notFound();
+  const canonical = grantPath(resolvedGrant);
+  const current = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}${
+    paramId ? `?id=${encodeURIComponent(paramId)}` : ""
+  }`;
+
+  if (current !== canonical) {
+    redirect(canonical);
   }
 
   const stateName = sentenceCase(params.state);
   const cityName = sentenceCase(params.city);
   const categoryName = sentenceCase(params.category);
-  const detailPath = `/grants/${params.state}/${params.city}/${params.category}/${params.slug}?id=${encodeURIComponent(grant.id)}`;
+  const detailPath = canonical;
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -92,52 +105,52 @@ export default async function GrantDetailPage({
     { label: stateName, href: `/grants/${params.state}` },
     { label: cityName, href: `/grants/${params.state}/${params.city}` },
     { label: categoryName, href: `/grants/${params.state}/${params.city}/${params.category}` },
-    { label: grant.title, href: detailPath },
+    { label: resolvedGrant.title, href: detailPath },
   ];
 
   const [categoryRelated, stateRelated] = await Promise.all([
-    grant.category && grant.state
-      ? searchGrants({ state: grant.state, category: grant.category, page: 1, pageSize: 6 })
+    resolvedGrant.category && resolvedGrant.state
+      ? searchGrants({ state: resolvedGrant.state, category: resolvedGrant.category, page: 1, pageSize: 6 })
       : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
-    grant.state
-      ? searchGrants({ state: grant.state, page: 1, pageSize: 6 })
+    resolvedGrant.state
+      ? searchGrants({ state: resolvedGrant.state, page: 1, pageSize: 6 })
       : Promise.resolve({ grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 }),
   ]);
 
   const moreCategory = (categoryRelated.grants ?? [])
-    .filter((item) => item.id !== grant.id)
+    .filter((item) => item.id !== resolvedGrant.id)
     .slice(0, 6);
   const moreState = (stateRelated.grants ?? [])
-    .filter((item) => item.id !== grant.id)
+    .filter((item) => item.id !== resolvedGrant.id)
     .slice(0, 6);
 
   const relatedLinks = [
-    grant.category
+    resolvedGrant.category
       ? {
-          label: `More ${grant.category} grants`,
-          href: `/grants?category=${encodeURIComponent(grant.category)}`,
+          label: `More ${resolvedGrant.category} grants`,
+          href: `/grants?category=${encodeURIComponent(resolvedGrant.category)}`,
         }
       : null,
-    grant.state
+    resolvedGrant.state
       ? {
-          label: `Funding in ${grant.state}`,
-          href: `/grants?state=${encodeURIComponent(grant.state)}`,
+          label: `Funding in ${resolvedGrant.state}`,
+          href: `/grants?state=${encodeURIComponent(resolvedGrant.state)}`,
         }
       : null,
-    grant.agency
+    resolvedGrant.agency
       ? {
-          label: `Programs from ${grant.agency}`,
-          href: `/grants?agency=${encodeURIComponent(grant.agency)}`,
+          label: `Programs from ${resolvedGrant.agency}`,
+          href: `/grants?agency=${encodeURIComponent(resolvedGrant.agency)}`,
         }
       : null,
   ].filter((link): link is { label: string; href: string } => Boolean(link));
 
-  const grantJsonLd = generateGrantJsonLd(grant, { path: detailPath });
+  const grantJsonLd = generateGrantJsonLd(resolvedGrant, { path: detailPath });
 
   return (
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
-      <GrantDetail grant={grant} />
+      <GrantDetail grant={resolvedGrant} />
 
       {moreCategory.length > 0 && (
         <section className="space-y-4">

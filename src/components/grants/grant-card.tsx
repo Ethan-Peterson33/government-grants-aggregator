@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { buildGrantPath } from "@/lib/slug";
+import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 
 function stripHtml(html: string): string {
@@ -19,7 +19,7 @@ function getSummary(grant: Grant): string | null {
 }
 
 export function GrantCard({ grant }: { grant: Grant }) {
-  const detailPath = buildGrantPath(grant);
+  const href = grantPath(grant);
   const locationParts = [grant.city, grant.state].filter(Boolean);
   const summary = getSummary(grant);
 
@@ -27,10 +27,7 @@ export function GrantCard({ grant }: { grant: Grant }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-xl">
-          <Link
-            href={{ pathname: detailPath, query: { id: grant.id } }}
-            className="text-slate-900 hover:text-blue-700"
-          >
+          <Link href={href} className="text-slate-900 hover:text-blue-700">
             {grant.title}
           </Link>
         </CardTitle>

@@ -1,4 +1,4 @@
-import { buildGrantPath } from "@/lib/slug";
+import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 
 type BreadcrumbItem = {
@@ -9,8 +9,8 @@ type BreadcrumbItem = {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "https://example.com";
 
 export function generateGrantJsonLd(grant: Grant, options?: { path?: string }) {
-  const grantPath = options?.path ?? `${buildGrantPath(grant)}?id=${encodeURIComponent(grant.id)}`;
-  const grantUrl = `${SITE_URL}${grantPath}`;
+  const path = options?.path ?? grantPath(grant);
+  const grantUrl = `${SITE_URL}${path}`;
   const plainDescription = grant.description
     ? grant.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || undefined
     : undefined;
@@ -58,7 +58,7 @@ export function generateItemListJsonLd(grants: Grant[]) {
       "@type": "ListItem",
       position: index + 1,
       name: grant.title,
-      url: `${SITE_URL}${buildGrantPath(grant)}?id=${encodeURIComponent(grant.id)}`,
+      url: `${SITE_URL}${grantPath(grant)}`,
     })),
   };
 }

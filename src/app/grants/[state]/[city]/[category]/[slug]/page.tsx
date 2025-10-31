@@ -90,15 +90,19 @@ export default async function GrantDetailPage({
   params,
   searchParams,
 }: {
-  params: { state: string; city: string; category: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ state: string; city: string; category: string; slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  console.log("🧭 [GrantDetailPage] params:", params, "searchParams:", searchParams);
+  const resolvedParams = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
 
-  const rawId = searchParams?.id;
+  console.log("🧭 [GrantDetailPage] resolvedParams:", resolvedParams);
+  console.log("🧭 [GrantDetailPage] resolvedSearchParams:", resolvedSearchParams);
+
+  const rawId = resolvedSearchParams?.id;
   const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
   const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
-  const slugShort = extractShortIdFromSlug(params.slug);
+  const slugShort = extractShortIdFromSlug(resolvedParams.slug);
 
   console.log("🔍 [GrantDetailPage] grantId:", grantId, "slugShort:", slugShort);
 

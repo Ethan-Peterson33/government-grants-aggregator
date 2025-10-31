@@ -22,12 +22,9 @@ function isGrant(value: unknown): value is Grant {
   return typeof record.id === "string" && typeof record.title === "string";
 }
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: { state: string; city: string; category: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+export async function generateMetadata({ params, searchParams }) {
+  const resolvedParams = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
 }): Promise<Metadata> {
   console.log("🧭 [generateMetadata] params:", params, "searchParams:", searchParams);
 
@@ -75,20 +72,20 @@ export async function generateMetadata({
   };
 }
 
-export default async function GrantDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { state: string; city: string; category: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+export default async function GrantDetailPage({ params, searchParams }: {
+  params: Promise<{ state: string; city: string; category: string; slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  console.log("🧭 [GrantDetailPage] params:", params, "searchParams:", searchParams);
+  const resolvedParams = await params;
+  const resolvedSearchParams = (await searchParams) ?? {};
 
-  const rawId = searchParams?.id;
+  console.log("🧭 [GrantDetailPage] resolvedParams:", resolvedParams, "resolvedSearchParams:", resolvedSearchParams);
+
+  const rawId = resolvedSearchParams?.id;
   const paramId = Array.isArray(rawId) ? rawId[0] : rawId;
   const grantId = typeof paramId === "string" ? decodeURIComponent(paramId) : undefined;
-
-  const slugShort = extractShortIdFromSlug(params.slug);
+  const slugShort = extractShortIdFromSlug(resolvedParams.slug);
+  
   console.log("🔍 [GrantDetailPage] grantId:", grantId, "slugShort:", slugShort);
 
   let grant: Grant | null = null;

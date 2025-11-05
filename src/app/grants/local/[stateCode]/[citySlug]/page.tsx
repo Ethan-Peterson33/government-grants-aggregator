@@ -46,7 +46,8 @@ export default async function LocalGrantsPage({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const stateInfo = resolveStateParam(params.stateCode);
-  const cityName = cityNameFromSlug(params.citySlug);
+  const citySlug = params.citySlug;
+  const cityName = cityNameFromSlug(citySlug);
   const page = safeNumber(searchParams?.page, 1);
   const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, PAGE_SIZE));
   const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
@@ -66,21 +67,21 @@ export default async function LocalGrantsPage({
     { label: "Home", href: "/" },
     { label: "Grants", href: "/grants" },
     { label: stateInfo.name, href: `/grants/state/${stateInfo.code}` },
-    { label: cityName, href: `/grants/local/${stateInfo.code}/${params.citySlug}` },
+    { label: cityName, href: `/grants/local/${stateInfo.code}/${citySlug}` },
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
   const buildPageHref = (targetPage: number) => {
-    const params = new URLSearchParams();
-    if (targetPage > 1) params.set("page", String(targetPage));
-    if (pageSize !== PAGE_SIZE) params.set("pageSize", String(pageSize));
-    if (rawCategory) params.set("category", rawCategory);
-    const query = params.toString();
+    const queryParams = new URLSearchParams();
+    if (targetPage > 1) queryParams.set("page", String(targetPage));
+    if (pageSize !== PAGE_SIZE) queryParams.set("pageSize", String(pageSize));
+    if (rawCategory) queryParams.set("category", rawCategory);
+    const query = queryParams.toString();
     return query
-      ? `/grants/local/${stateInfo.code}/${params.citySlug}?${query}`
-      : `/grants/local/${stateInfo.code}/${params.citySlug}`;
+      ? `/grants/local/${stateInfo.code}/${citySlug}?${query}`
+      : `/grants/local/${stateInfo.code}/${citySlug}`;
   };
 
   const relatedLinks = [
@@ -89,7 +90,7 @@ export default async function LocalGrantsPage({
     category
       ? {
           label: `More ${category.toLowerCase()} funding`,
-          href: `/grants/local/${stateInfo.code}/${params.citySlug}?category=${encodeURIComponent(category)}`,
+          href: `/grants/local/${stateInfo.code}/${citySlug}?category=${encodeURIComponent(category)}`,
         }
       : null,
   ].filter((link): link is { label: string; href: string } => Boolean(link));

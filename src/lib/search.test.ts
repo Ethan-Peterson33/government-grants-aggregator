@@ -26,6 +26,7 @@ const grants: Grant[] = [
     summary: "Funding for STEM programs",
     description: "Grants to expand science education initiatives.",
     state: "CA",
+    city: "Statewide",
     agency: "National Science Foundation",
     scraped_at: "2024-03-01T00:00:00Z",
   },
@@ -36,6 +37,7 @@ const grants: Grant[] = [
     summary: "Community health support",
     description: "Programs improving rural healthcare.",
     state: "TX",
+    city: "Austin",
     agency: "Health and Human Services",
     scraped_at: "2024-02-15T00:00:00Z",
   },
@@ -46,9 +48,22 @@ const grants: Grant[] = [
     summary: "Climate and environment research",
     description: "Projects focused on coastal resilience.",
     state: "CA",
+    city: "Los Angeles",
     agency: "Environmental Protection Agency",
     scraped_at: "2024-01-20T00:00:00Z",
     apply_link: null,
+  },
+  {
+    ...baseGrant,
+    id: "4",
+    title: "Nationwide Infrastructure Partnership",
+    summary: "Transportation and infrastructure improvements",
+    description: "Supports national projects improving transportation systems.",
+    state: null,
+    city: null,
+    category: "Infrastructure",
+    agency: "Department of Transportation",
+    scraped_at: "2023-12-31T00:00:00Z",
   },
 ];
 
@@ -64,6 +79,14 @@ describe("grantMatchesFilters", () => {
     expect(grantMatchesFilters(grants[0], { state: "tx" })).toBe(false);
     expect(grantMatchesFilters(grants[1], { agency: "health" })).toBe(true);
     expect(grantMatchesFilters(grants[1], { agency: "science" })).toBe(false);
+  });
+
+  it("respects jurisdiction and state code filters", () => {
+    expect(grantMatchesFilters(grants[0], { stateCode: "CA", jurisdiction: "state" })).toBe(true);
+    expect(grantMatchesFilters(grants[2], { jurisdiction: "local", stateCode: "CA" })).toBe(true);
+    expect(grantMatchesFilters(grants[1], { jurisdiction: "local" })).toBe(true);
+    expect(grantMatchesFilters(grants[3], { jurisdiction: "federal" })).toBe(true);
+    expect(grantMatchesFilters(grants[3], { stateCode: "CA" })).toBe(false);
   });
 
   it("requires apply links when hasApplyLink is true", () => {
@@ -89,5 +112,14 @@ describe("filterGrantsLocally", () => {
     const { grants: matches, total } = filterGrantsLocally(grants, { query: "nonexistent" });
     expect(total).toBe(0);
     expect(matches).toHaveLength(0);
+  });
+
+  it("filters by jurisdiction for local searches", () => {
+    const { grants: localGrants, total } = filterGrantsLocally(grants, {
+      jurisdiction: "local",
+      stateCode: "CA",
+    });
+    expect(total).toBe(1);
+    expect(localGrants[0].id).toBe("3");
   });
 });

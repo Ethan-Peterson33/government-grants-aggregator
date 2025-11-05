@@ -110,9 +110,9 @@ export default async function GrantsIndexPage({
   ].filter((link): link is { label: string; href: string } => Boolean(link));
 
   const fallbackLinks = [
-    { label: "Federal grants", href: "/grants?category=Federal" },
-    { label: "Education funding", href: "/grants?category=Education" },
-    { label: "Small business grants", href: "/grants?category=Business" },
+    { label: "Federal grants", href: "/grants/federal" },
+    { label: "California statewide funding", href: "/grants/state/CA" },
+    { label: "New York City grants", href: "/grants/local/NY/new-york-city" },
   ];
 
   return (

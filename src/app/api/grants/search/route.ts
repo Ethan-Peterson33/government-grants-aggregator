@@ -17,7 +17,14 @@ export async function GET(request: Request) {
   const keyword = searchParams.get("keyword") ?? searchParams.get("query") ?? undefined;
   const category = searchParams.get("category") ?? undefined;
   const state = searchParams.get("state") ?? undefined;
+  const stateCode = searchParams.get("stateCode") ?? undefined;
+  const city = searchParams.get("city") ?? undefined;
   const agency = searchParams.get("agency") ?? undefined;
+  const jurisdictionParam = searchParams.get("jurisdiction");
+  const jurisdiction =
+    jurisdictionParam === "federal" || jurisdictionParam === "state" || jurisdictionParam === "local"
+      ? jurisdictionParam
+      : undefined;
   const hasApplyLink = searchParams.get("has_apply_link") === "1";
 
   const page = parseNumber(searchParams.get("page"), 1, { min: 1 });
@@ -27,7 +34,10 @@ export async function GET(request: Request) {
     query: keyword,
     category: category ?? undefined,
     state: state ?? undefined,
+    stateCode: stateCode ?? undefined,
+    city: city ?? undefined,
     agency: agency ?? undefined,
+    jurisdiction,
     hasApplyLink,
     page,
     pageSize,

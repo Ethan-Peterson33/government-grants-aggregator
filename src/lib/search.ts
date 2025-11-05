@@ -94,6 +94,57 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   return { grants: [], total: 0, page, pageSize, totalPages: 0 };
 }
 
+const toComparable = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
+
+const textIncludes = (text: string | null | undefined, keyword: string) =>
+  toComparable(text).includes(keyword);
+
+export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolean {
+  const keyword = toComparable(filters.query);
+  if (keyword) {
+    const inTitle = textIncludes(grant.title, keyword);
+    const inSummary = textIncludes(grant.summary, keyword);
+    const inDescription = textIncludes(grant.description, keyword);
+    if (!inTitle && !inSummary && !inDescription) return false;
+  }
+
+  const category = toComparable(filters.category);
+  if (category && !textIncludes(grant.category, category)) return false;
+
+  const state = toComparable(filters.state);
+  if (state && toComparable(grant.state) !== state) return false;
+
+  const agency = toComparable(filters.agency);
+  if (agency && !textIncludes(grant.agency, agency)) return false;
+
+  if (filters.hasApplyLink && !grant.apply_link) return false;
+
+  return true;
+}
+
+export function filterGrantsLocally(
+  grants: Grant[],
+  filters: GrantFilters = {},
+  defaultPageSize = 20
+): SearchResult {
+  const page = filters.page && filters.page > 0 ? filters.page : 1;
+  const pageSize = filters.pageSize && filters.pageSize > 0 ? Math.min(filters.pageSize, 50) : defaultPageSize;
+
+  const filtered = grants.filter((grant) => grantMatchesFilters(grant, filters));
+  const sorted = filtered.sort((a, b) => (a.scraped_at > b.scraped_at ? -1 : 1));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize;
+  const paginated = sorted.slice(from, to);
+
+  return {
+    grants: paginated,
+    total: filtered.length,
+    page,
+    pageSize,
+    totalPages: filtered.length > 0 ? Math.ceil(filtered.length / pageSize) : 0,
+  };
+}
+
 export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;

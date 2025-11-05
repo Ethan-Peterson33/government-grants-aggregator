@@ -42,6 +42,18 @@ export default async function StateGrantsPage({
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (targetPage > 1) {
+      params.set("page", String(targetPage));
+    }
+    if (pageSize !== PAGE_SIZE) {
+      params.set("pageSize", String(pageSize));
+    }
+    const query = params.toString();
+    return query ? `/grants/${stateSlug}?${query}` : `/grants/${stateSlug}`;
+  };
+
   const relatedLinks = [
     { label: `${stateName} statewide programs`, href: `/grants/${stateSlug}/statewide` },
     { label: `${stateName} education funding`, href: `/grants/${stateSlug}/statewide/education` },
@@ -68,7 +80,14 @@ export default async function StateGrantsPage({
             </div>
           )}
         </div>
-        {hasResults && <Pagination total={total} pageSize={pageSize} currentPage={page} />}
+        {hasResults && (
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            hrefBuilder={buildPageHref}
+          />
+        )}
       </section>
 
       <RelatedLinks links={relatedLinks} />

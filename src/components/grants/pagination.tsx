@@ -1,87 +1,72 @@
+// src/components/grants/pagination.tsx
+
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import React from "react";
 
-type PaginationProps = {
+interface PaginationProps {
   total: number;
   pageSize: number;
   currentPage: number;
-  onPageChange?: (page: number) => void;
-  hrefBuilder?: (page: number) => string;
-  isLoading?: boolean;
-};
+  basePath: string;       // e.g. "/grants/federal"
+  rawCategory?: string;    // optional category slug, e.g. "Education"
+}
 
-export function Pagination({
+const Pagination: React.FC<PaginationProps> = ({
   total,
   pageSize,
   currentPage,
-  onPageChange,
-  hrefBuilder,
-  isLoading = false,
-}: PaginationProps) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  if (totalPages <= 1) return null;
+  basePath,
+  rawCategory,
+}) => {
+  const totalPages = Math.ceil(total / pageSize);
 
-  const canChangePage = typeof onPageChange === "function";
-  const hasHref = typeof hrefBuilder === "function";
+  if (totalPages <= 1) {
+    return null; // no pagination needed
+  }
 
-  const goToPage = (page: number) => {
-    const target = Math.max(1, Math.min(totalPages, page));
-    if (!canChangePage || target === currentPage) {
-      return;
-    }
-    onPageChange(target);
-  };
-
-  const disablePrev = currentPage === 1 || isLoading;
-  const disableNext = currentPage === totalPages || isLoading;
-
-  const linkClasses = cn(
-    "inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2",
-    "hover:bg-slate-100",
-    "disabled:pointer-events-none disabled:opacity-60"
-  );
-
+  // helper to build query string
   const buildHref = (page: number) => {
-    if (!hasHref) return "#";
-    return hrefBuilder(page);
+    const params = new URLSearchParams();
+    if (page > 1) {
+      params.set("page", String(page));
+    }
+    if (pageSize !== pageSize) {
+      // if you allow custom pageSize and want to include only when not default
+      params.set("pageSize", String(pageSize));
+    }
+    if (rawCategory) {
+      params.set("category", rawCategory);
+    }
+    const query = params.toString();
+    return query ? `${basePath}?${query}` : basePath;
   };
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-sm">
-      <span className="text-slate-600">Page {currentPage} of {totalPages}</span>
-      <div className="flex gap-2">
-        {hasHref && !canChangePage ? (
+    <nav aria-label="Pagination" className="flex space-x-2 justify-center mt-6">
+      {pageNumbers.map((pageNum) => {
+        const href = buildHref(pageNum);
+        const isActive = pageNum === currentPage;
+        return (
           <Link
-            href={buildHref(currentPage - 1)}
-            className={cn(linkClasses, disablePrev && "pointer-events-none opacity-60")}
-            aria-disabled={disablePrev}
-            tabIndex={disablePrev ? -1 : 0}
+            key={pageNum}
+            href={href}
+            className={`px-3 py-1 border rounded ${
+              isActive
+                ? "bg-slate-900 text-white"
+                : "bg-white text-slate-900 hover:bg-slate-100"
+            }`}
+            aria-current={isActive ? "page" : undefined}
           >
-            Previous
+            {pageNum}
           </Link>
-        ) : (
-          <Button type="button" variant="outline" disabled={disablePrev} onClick={() => goToPage(currentPage - 1)}>
-            Previous
-          </Button>
-        )}
-        {hasHref && !canChangePage ? (
-          <Link
-            href={buildHref(currentPage + 1)}
-            className={cn(linkClasses, disableNext && "pointer-events-none opacity-60")}
-            aria-disabled={disableNext}
-            tabIndex={disableNext ? -1 : 0}
-          >
-            Next
-          </Link>
-        ) : (
-          <Button type="button" variant="outline" disabled={disableNext} onClick={() => goToPage(currentPage + 1)}>
-            Next
-          </Button>
-        )}
-      </div>
-    </div>
+        );
+      })}
+    </nav>
   );
-}
+};
+
+export { Pagination };

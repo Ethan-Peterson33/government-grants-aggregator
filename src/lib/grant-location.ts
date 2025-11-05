@@ -222,7 +222,8 @@ export function inferGrantLocation(grant: Pick<Grant, "state" | "city">): GrantL
 
   const stateInfo = findStateInfo(grant.state);
   const rawState = (grant.state ?? "").trim();
-  const stateCode = (stateInfo?.code ?? rawState.slice(0, 2) || "US").toUpperCase();
+  const fallbackStateCode = rawState.slice(0, 2) || "US";
+  const stateCode = (stateInfo?.code ?? fallbackStateCode).toUpperCase();
 
   if (isStatewideCity(grant.city)) {
     return { jurisdiction: "state", stateCode };

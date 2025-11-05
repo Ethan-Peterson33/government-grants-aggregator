@@ -103,7 +103,11 @@ export default async function FederalGrantsPage({
           )}
         </div>
         {hasResults && (
-          <Pagination total={total} pageSize={pageSize} currentPage={page} hrefBuilder={buildPageHref} />
+          <Pagination   total={total}
+                        pageSize={pageSize}
+                        currentPage={page}
+                        basePath="/grants/federal"
+                        rawCategory={rawCategory} />
         )}
       </section>
 

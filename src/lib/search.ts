@@ -49,8 +49,22 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
-  const jurisdiction = filters.jurisdiction;
   const hasApplyLink = filters.hasApplyLink === true;
+
+  const hasExplicitLocationFilter = Boolean(stateCode || sanitizedState || sanitizedCity);
+  const jurisdiction =
+    filters.jurisdiction ?? (hasExplicitLocationFilter ? undefined : ("federal" as const));
+
+  console.log("➡️ Final grant query filters", {
+    sanitizedQuery,
+    sanitizedCategory,
+    sanitizedState,
+    sanitizedCity,
+    sanitizedAgency,
+    stateCode,
+    jurisdiction: jurisdiction ?? "all",
+    hasApplyLink,
+  });
 
   for (const table of TABLE_FALLBACK_ORDER) {
     let q = supabase

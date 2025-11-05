@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
-import { FiltersBar, type FilterOption } from "@/components/grants/filters-bar";
-import { GrantCard } from "@/components/grants/grant-card";
-import { Pagination } from "@/components/grants/pagination";
+import type { FilterOption } from "@/components/grants/filters-bar";
+import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
-import type { Grant } from "@/lib/types";
 
 const PAGE_SIZE = 12;
 
@@ -22,7 +20,9 @@ export async function generateMetadata({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const query = typeof searchParams?.query === "string" ? searchParams.query : undefined;
+  const keyword = typeof searchParams?.keyword === "string" ? searchParams.keyword : undefined;
+  const legacyQuery = typeof searchParams?.query === "string" ? searchParams.query : undefined;
+  const query = keyword ?? legacyQuery;
   const category = typeof searchParams?.category === "string" ? searchParams.category : undefined;
   const state = typeof searchParams?.state === "string" ? searchParams.state : undefined;
   const agency = typeof searchParams?.agency === "string" ? searchParams.agency : undefined;
@@ -56,7 +56,9 @@ export default async function GrantsIndexPage({
 
   const page = safeNumber(params?.page, 1);
   const pageSize = Math.min(50, safeNumber(params?.pageSize, PAGE_SIZE));
-  const query = typeof params?.query === "string" ? params.query : undefined;
+  const queryParam = typeof params?.query === "string" ? params.query : undefined;
+  const keywordParam = typeof params?.keyword === "string" ? params.keyword : undefined;
+  const query = keywordParam ?? queryParam;
   const category = typeof params?.category === "string" ? params.category : undefined;
   const state = typeof params?.state === "string" ? params.state : undefined;
   const agency = typeof params?.agency === "string" ? params.agency : undefined;
@@ -72,7 +74,8 @@ export default async function GrantsIndexPage({
     hasApplyLink,
   };
 
-  const [{ grants, total }, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
+  const [searchResult, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
+  const { grants, total, totalPages } = searchResult;
 
   const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
   const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
@@ -84,7 +87,6 @@ export default async function GrantsIndexPage({
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
-  const hasResults = grants.length > 0;
 
   const relatedLinks = [
     categoryOptions[0] && categoryOptions[0].value !== category
@@ -126,28 +128,22 @@ export default async function GrantsIndexPage({
                 mission.
               </p>
             </header>
-            <FiltersBar
-              filters={{ query, category, state, agency, hasApplyLink }}
+            <GrantsSearchClient
+              initialFilters={{
+                query: query ?? "",
+                category: category ?? "",
+                state: state ?? "",
+                agency: agency ?? "",
+                hasApplyLink,
+                page,
+                pageSize,
+              }}
+              initialResults={{ grants, total, page, pageSize, totalPages }}
               categories={categoryOptions}
               states={stateOptions}
               agencies={agencyOptions}
             />
           </section>
-
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-slate-800">Latest opportunities ({total})</h2>
-            <div className="space-y-4">
-              {hasResults ? (
-                grants.map((grant: Grant) => <GrantCard key={grant.id} grant={grant} />)
-              ) : (
-                <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
-                  <p>No grants match your filters yet. Try broadening your search or exploring another category.</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          {hasResults && <Pagination total={total} pageSize={pageSize} currentPage={page} />}
         </div>
 
         <div className="w-full space-y-4 lg:w-72">

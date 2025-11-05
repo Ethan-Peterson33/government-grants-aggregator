@@ -19,13 +19,17 @@ export type Grant = {
   close_date?: string | null;
 };
 
+export type GrantJurisdiction = "federal" | "state" | "local";
+
 export type GrantFilters = {
   query?: string;
   category?: string;
   state?: string;
+  stateCode?: string;
   city?: string;
   agency?: string;
   hasApplyLink?: boolean;
+  jurisdiction?: GrantJurisdiction;
   page?: number;
   pageSize?: number;
 };

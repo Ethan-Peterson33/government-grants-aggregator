@@ -1,4 +1,11 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import {
+  FEDERAL_STATE_LABELS,
+  STATEWIDE_CITY_LABELS,
+  inferGrantLocation,
+  normalizeStateCode,
+  stateNameCandidatesFromCode,
+} from "@/lib/grant-location";
 import { shortId } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
@@ -41,7 +48,12 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const sanitizedState = like(filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
+  const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
+
+  const hasExplicitLocationFilter = Boolean(stateCode || sanitizedState || sanitizedCity);
+  const jurisdiction =
+    filters.jurisdiction ?? (hasExplicitLocationFilter ? undefined : ("federal" as const));
 
   console.log("➡️ Final grant query filters", {
     sanitizedQuery,
@@ -49,6 +61,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     sanitizedState,
     sanitizedCity,
     sanitizedAgency,
+    stateCode,
+    jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
   });
 
@@ -64,10 +78,43 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         `(title.ilike.%${sanitizedQuery}%,summary.ilike.%${sanitizedQuery}%,description.ilike.%${sanitizedQuery}%)`
       );
     if (sanitizedCategory) q = q.ilike("category", `%${sanitizedCategory}%`);
-    if (sanitizedState) q = q.ilike("state", `%${sanitizedState}%`);
+
+    if (stateCode) {
+      const candidateClauses = stateNameCandidatesFromCode(stateCode).map(
+        (candidate) => `state.ilike.%${escapeIlike(candidate)}%`
+      );
+      const clauses = candidateClauses.length
+        ? candidateClauses
+        : [`state.ilike.%${escapeIlike(stateCode)}%`];
+      q = q.or(clauses.join(","));
+    } else if (sanitizedState) {
+      q = q.ilike("state", `%${sanitizedState}%`);
+    }
+
     if (sanitizedCity) q = q.ilike("city", `%${sanitizedCity}%`);
     if (sanitizedAgency) q = q.ilike("agency", `%${sanitizedAgency}%`);
     if (hasApplyLink) q = q.not("apply_link", "is", null);
+
+    if (jurisdiction === "federal") {
+      const orClauses = ["state.is.null"];
+      for (const label of FEDERAL_STATE_LABELS) {
+        const sanitizedLabel = escapeIlike(label);
+        orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+      }
+      q = q.or(orClauses.join(","));
+    } else if (jurisdiction === "state") {
+      const cityClauses = ["city.is.null"];
+      for (const label of STATEWIDE_CITY_LABELS) {
+        const sanitizedLabel = escapeIlike(label);
+        cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
+      }
+      q = q.or(cityClauses.join(","));
+    } else if (jurisdiction === "local") {
+      q = q.not("city", "is", null).not("city", "eq", "");
+      for (const label of STATEWIDE_CITY_LABELS) {
+        q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
+      }
+    }
 
     const { data, error, count } = (await q) as unknown as {
       data: Grant[] | null;
@@ -111,8 +158,24 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   const category = toComparable(filters.category);
   if (category && !textIncludes(grant.category, category)) return false;
 
+  const location = inferGrantLocation(grant);
+
+  const filterStateCode = normalizeStateCode(filters.stateCode ?? undefined);
+  if (filterStateCode) {
+    if (location.jurisdiction === "federal") return false;
+    if (location.stateCode.toUpperCase() !== filterStateCode) return false;
+  }
+
+  if (filters.jurisdiction && location.jurisdiction !== filters.jurisdiction) return false;
+
   const state = toComparable(filters.state);
-  if (state && toComparable(grant.state) !== state) return false;
+  if (state) {
+    const grantState = toComparable(grant.state);
+    if (!grantState || !grantState.includes(state)) return false;
+  }
+
+  const cityFilter = toComparable(filters.city);
+  if (cityFilter && !textIncludes(grant.city, cityFilter)) return false;
 
   const agency = toComparable(filters.agency);
   if (agency && !textIncludes(grant.agency, agency)) return false;

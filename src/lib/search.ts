@@ -52,17 +52,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const jurisdiction = filters.jurisdiction;
   const hasApplyLink = filters.hasApplyLink === true;
 
-  console.log("➡️ Final grant query filters", {
-    sanitizedQuery,
-    sanitizedCategory,
-    sanitizedState,
-    sanitizedCity,
-    sanitizedAgency,
-    stateCode,
-    jurisdiction,
-    hasApplyLink,
-  });
-
   for (const table of TABLE_FALLBACK_ORDER) {
     let q = supabase
       .from(table)

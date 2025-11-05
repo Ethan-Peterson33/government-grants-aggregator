@@ -215,7 +215,9 @@ export type GrantLocation =
   | { jurisdiction: "state"; stateCode: string }
   | { jurisdiction: "local"; stateCode: string; citySlug: string };
 
-export function inferGrantLocation(grant: Pick<Grant, "state" | "city">): GrantLocation {
+export function inferGrantLocation(
+  grant: { state?: string | null; city?: string | null }
+): GrantLocation {
   if (isFederalStateValue(grant.state)) {
     return { jurisdiction: "federal" };
   }

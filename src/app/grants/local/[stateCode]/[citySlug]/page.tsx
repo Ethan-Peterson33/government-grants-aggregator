@@ -118,9 +118,15 @@ export default async function LocalGrantsPage({
             </div>
           )}
         </div>
-        {hasResults && (
-          <Pagination total={total} pageSize={pageSize} currentPage={page} hrefBuilder={buildPageHref} />
-        )}
+{hasResults && (
+  <Pagination
+    total={total}
+    pageSize={pageSize}
+    currentPage={page}
+    basePath={`/grants/local/${stateInfo.code}/${citySlug}`}
+    rawCategory={rawCategory}
+  />
+)}
       </section>
 
       <RelatedLinks links={relatedLinks} />

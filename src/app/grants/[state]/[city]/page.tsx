@@ -50,6 +50,18 @@ export default async function CityGrantsPage({
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (targetPage > 1) {
+      params.set("page", String(targetPage));
+    }
+    if (pageSize !== PAGE_SIZE) {
+      params.set("pageSize", String(pageSize));
+    }
+    const query = params.toString();
+    return query ? `/grants/${state}/${city}?${query}` : `/grants/${state}/${city}`;
+  };
+
   const relatedLinks = [
     { label: `All ${stateName} grants`, href: `/grants/${state}` },
     { label: `${cityName} business funding`, href: `/grants/${state}/${city}/business` },
@@ -76,7 +88,14 @@ export default async function CityGrantsPage({
             </div>
           )}
         </div>
-        {hasResults && <Pagination total={total} pageSize={pageSize} currentPage={page} />}
+        {hasResults && (
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            hrefBuilder={buildPageHref}
+          />
+        )}
       </section>
 
       <RelatedLinks links={relatedLinks} />

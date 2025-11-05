@@ -58,6 +58,20 @@ export default async function CategoryGrantsPage({
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (targetPage > 1) {
+      params.set("page", String(targetPage));
+    }
+    if (pageSize !== PAGE_SIZE) {
+      params.set("pageSize", String(pageSize));
+    }
+    const query = params.toString();
+    return query
+      ? `/grants/${state}/${city}/${category}?${query}`
+      : `/grants/${state}/${city}/${category}`;
+  };
+
   return (
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
@@ -80,7 +94,14 @@ export default async function CategoryGrantsPage({
             </div>
           )}
         </div>
-        {hasResults && <Pagination total={total} pageSize={pageSize} currentPage={page} />}
+        {hasResults && (
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            hrefBuilder={buildPageHref}
+          />
+        )}
       </section>
 
       <script

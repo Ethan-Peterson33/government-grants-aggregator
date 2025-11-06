@@ -3,53 +3,26 @@ import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
+import { deriveAgencySlug } from "@/lib/slug";
+import { toAgency, type AgencyRow } from "@/lib/agency";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { safeNumber } from "@/lib/search";
-import { slugify } from "@/lib/strings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Agency, Grant } from "@/lib/types";
 
-type AgencyRow = {
-  id: string;
-  slug: string;
-  agency_name?: string | null;
-  name?: string | null;
-  agency_code?: string | null;
-  description?: string | null;
-  website?: string | null;
-  contacts?: unknown;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
 type GrantRow = Record<string, any>;
-
-function normalizeAgency(row: AgencyRow | null | undefined): Agency | null {
-  if (!row) return null;
-  const agencyName = row.agency_name ?? row.name ?? "";
-  if (!agencyName) return null;
-  return {
-    id: row.id,
-    slug: row.slug,
-    agency_name: agencyName,
-    agency_code: row.agency_code ?? null,
-    description: row.description ?? null,
-    website: row.website ?? null,
-    contacts: row.contacts ?? null,
-    created_at: row.created_at ?? null,
-    updated_at: row.updated_at ?? null,
-  } satisfies Agency;
-}
 
 function normalizeGrant(row: GrantRow): Grant {
   const agencyName = row.agency_name ?? row.agency ?? null;
   const categoryLabel = row.category ?? row.category_code ?? null;
-  const fallbackSlug = agencyName ? slugify(agencyName) : "";
+  const slug =
+    row.agency_slug ??
+    deriveAgencySlug({ agency_code: row.agency_code ?? undefined, agency_name: agencyName ?? undefined });
   return {
     ...row,
     agency: agencyName,
     agency_name: agencyName,
-    agency_slug: row.agency_slug ?? (fallbackSlug ? fallbackSlug : null),
+    agency_slug: slug || null,
     category: categoryLabel,
     category_code: row.category_code ?? null,
   } as Grant;
@@ -59,18 +32,63 @@ async function loadAgency(slug: string): Promise<Agency | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
 
-  const { data, error } = await supabase
+  const { data: byCode, error: byCodeError } = await supabase
     .from("agencies")
     .select("*")
-    .eq("slug", slug)
+    .ilike("agency_code", slug)
     .maybeSingle();
 
-  if (error) {
-    console.error("❌ Failed to load agency", { slug, error });
+  if (byCodeError) {
+    console.error("❌ Failed to load agency by code", { slug, error: byCodeError });
     return null;
   }
 
-  return normalizeAgency(data as AgencyRow | null);
+  if (byCode) {
+    return toAgency(byCode as AgencyRow, slug);
+  }
+
+  const { data: grantAgency, error: grantError } = await supabase
+    .from("grants")
+    .select("agency_code, agency_name, agency")
+    .eq("agency_slug", slug)
+    .limit(1)
+    .maybeSingle();
+
+  if (grantError) {
+    console.error("❌ Failed to load fallback agency from grants", { slug, error: grantError });
+    return null;
+  }
+
+  if (grantAgency?.agency_code) {
+    const { data: fromCode, error: fromCodeError } = await supabase
+      .from("agencies")
+      .select("*")
+      .ilike("agency_code", grantAgency.agency_code)
+      .maybeSingle();
+
+    if (fromCodeError) {
+      console.error("❌ Failed to load agency using grant code", {
+        slug,
+        agency_code: grantAgency.agency_code,
+        error: fromCodeError,
+      });
+    } else if (fromCode) {
+      return toAgency(fromCode as AgencyRow, slug);
+    }
+  }
+
+  if (grantAgency) {
+    return toAgency(
+      {
+        id: grantAgency.agency_code ?? slug,
+        agency_code: grantAgency.agency_code ?? null,
+        agency_name: grantAgency.agency_name ?? grantAgency.agency ?? slug,
+      },
+      slug,
+    );
+  }
+
+  return null;
 }
 
 async function loadAgencyGrants(slug: string, page: number, pageSize: number) {

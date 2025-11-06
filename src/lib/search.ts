@@ -6,9 +6,9 @@ import {
   normalizeStateCode,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
+import { deriveAgencySlug } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
-import { slugify } from "@/lib/strings";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
@@ -175,12 +175,17 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     const grants = (data ?? []).map((grant) => {
       const agencyName = grant.agency_name ?? grant.agency ?? null;
       const categoryLabel = grant.category ?? grant.category_code ?? null;
-      const fallbackSlug = agencyName ? slugify(agencyName) : "";
+      const fallbackSlug = deriveAgencySlug({
+        slug: grant.agency_slug ?? undefined,
+        agency_code: grant.agency_code ?? undefined,
+        agency_name: agencyName,
+        agency: grant.agency ?? undefined,
+      });
       return {
         ...grant,
         agency: agencyName,
         agency_name: agencyName,
-        agency_slug: grant.agency_slug ?? (fallbackSlug ? fallbackSlug : null),
+        agency_slug: fallbackSlug || null,
         category: categoryLabel,
         category_code: grant.category_code ?? null,
       };

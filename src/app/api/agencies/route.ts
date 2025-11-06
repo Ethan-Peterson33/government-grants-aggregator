@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toAgency, type AgencyRow } from "@/lib/agency";
+import type { Agency } from "@/lib/types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function escapeIlike(value: string): string {
@@ -26,11 +28,7 @@ export async function GET(request: NextRequest) {
 
   if (q) {
     const sanitized = escapeIlike(q);
-    const clauses = [
-      `slug.ilike.%${sanitized}%`,
-      `agency_name.ilike.%${sanitized}%`,
-      `agency_code.ilike.%${sanitized}%`,
-    ];
+    const clauses = [`agency_name.ilike.%${sanitized}%`, `agency_code.ilike.%${sanitized}%`];
     query = query.or(clauses.join(","));
   }
 
@@ -41,15 +39,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ agencies: data ?? [], total: count ?? 0, page, pageSize });
+  const agencies = (data ?? [])
+    .map((row) => toAgency(row as AgencyRow, undefined))
+    .filter((row): row is Agency => row !== null);
+
+  return NextResponse.json({
+    agencies,
+    total: count ?? agencies.length,
+    page,
+    pageSize,
+  });
 }
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { slug, agency_name, agency_code, description, website, contacts } = body ?? {};
 
-  if (!slug || !agency_name) {
-    return NextResponse.json({ error: "slug and agency_name required" }, { status: 400 });
+  const code =
+    typeof agency_code === "string" && agency_code.trim().length > 0
+      ? agency_code.trim()
+      : typeof slug === "string" && slug.trim().length > 0
+      ? slug.trim()
+      : null;
+
+  if (!code || !agency_name) {
+    return NextResponse.json({ error: "agency_code (or slug) and agency_name required" }, { status: 400 });
   }
 
   const supabase = createServerSupabaseClient();
@@ -58,9 +72,8 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = {
-    slug,
     agency_name,
-    agency_code: agency_code ?? null,
+    agency_code: code,
     description: description ?? null,
     website: website ?? null,
     contacts: contacts ?? null,
@@ -68,15 +81,16 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("agencies")
-    .upsert(payload, { onConflict: "slug" })
+    .upsert(payload, { onConflict: "agency_code" })
     .select()
     .limit(1);
 
   if (error) {
-    console.error("❌ Failed to upsert agency", { slug, error });
+    console.error("❌ Failed to upsert agency", { code, error });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   const [agency] = data ?? [];
-  return NextResponse.json(agency ?? payload);
+  const normalized = toAgency((agency ?? payload) as AgencyRow, slug ?? code);
+  return NextResponse.json(normalized ?? { ...payload, slug: slug ?? code });
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { grantPath } from "@/lib/slug";
+import { deriveAgencySlug, grantPath } from "@/lib/slug";
 import { slugify } from "@/lib/strings";
 import type { Grant } from "@/lib/types";
 
@@ -24,7 +24,9 @@ export function GrantCard({ grant }: { grant: Grant }) {
   const locationParts = [grant.city, grant.state].filter(Boolean);
   const summary = getSummary(grant);
   const agencyName = grant.agency_name ?? grant.agency ?? null;
-  const agencySlug = grant.agency_slug ?? (agencyName ? slugify(agencyName) : "");
+  const agencySlug =
+    grant.agency_slug ??
+    deriveAgencySlug({ agency_code: grant.agency_code, agency_name: agencyName ?? null });
   const categoryLabel = grant.category ?? grant.category_code ?? null;
   const categorySlug = categoryLabel ? slugify(categoryLabel) : "";
 

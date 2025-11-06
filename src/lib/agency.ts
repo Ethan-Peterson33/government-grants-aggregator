@@ -14,6 +14,81 @@ export type AgencyRow = {
   updated_at?: string | null;
 };
 
+export function escapeIlike(value: string): string {
+  return value.replace(/[%_]/g, (match) => `\\${match}`).replace(/'/g, "''");
+}
+
+export function agencySlugCandidates(slug: string) {
+  const normalized = typeof slug === "string" ? slug.trim().toLowerCase() : "";
+  if (!normalized) {
+    return {
+      slug: "",
+      nameFragment: "",
+      codeCandidates: [] as string[],
+    };
+  }
+
+  const collapsed = normalized.replace(/-/g, " ").replace(/\s+/g, " ").trim();
+  const codeCandidates = new Set<string>();
+  codeCandidates.add(normalized);
+
+  const upper = normalized.toUpperCase();
+  codeCandidates.add(upper);
+
+  const noHyphen = normalized.replace(/-/g, "");
+  if (noHyphen) {
+    codeCandidates.add(noHyphen);
+    codeCandidates.add(noHyphen.toUpperCase());
+  }
+
+  return {
+    slug: normalized,
+    nameFragment: collapsed,
+    codeCandidates: Array.from(codeCandidates).filter(Boolean),
+  };
+}
+
+export function agencyGrantFilterClauses(agency: Agency) {
+  const clauses = new Set<string>();
+
+  if (agency.id) {
+    clauses.add(`agency_id.eq.${agency.id}`);
+  }
+
+  if (agency.agency_code) {
+    for (const code of agencySlugCandidates(agency.agency_code).codeCandidates) {
+      clauses.add(`agency_code.ilike.${escapeIlike(code)}`);
+    }
+  }
+
+  const nameFragments = new Set<string>();
+  if (agency.agency_name) {
+    nameFragments.add(agency.agency_name.trim().toLowerCase());
+  }
+
+  const slugCandidates = agencySlugCandidates(agency.slug);
+  if (slugCandidates.nameFragment) {
+    nameFragments.add(slugCandidates.nameFragment);
+  }
+
+  if (agency.agency_code) {
+    const fromCode = agencySlugCandidates(agency.agency_code).nameFragment;
+    if (fromCode) {
+      nameFragments.add(fromCode);
+    }
+  }
+
+  for (const fragment of nameFragments) {
+    const normalized = fragment.trim().toLowerCase();
+    if (!normalized) continue;
+    const pattern = `%${escapeIlike(normalized)}%`;
+    clauses.add(`agency_name.ilike.${pattern}`);
+    clauses.add(`agency.ilike.${pattern}`);
+  }
+
+  return Array.from(clauses);
+}
+
 function coalesceSlug(
   row: AgencyRow,
   fallbackSlug?: string

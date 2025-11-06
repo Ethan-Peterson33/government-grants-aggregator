@@ -1,4 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
   STATEWIDE_CITY_LABELS,
@@ -11,10 +12,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
-
-function escapeIlike(value: string): string {
-  return value.replace(/[%_]/g, (m) => `\\${m}`).replace(/'/g, "''");
-}
 
 export function safeNumber(value: string | string[] | undefined, fallback: number) {
   if (Array.isArray(value)) value = value[0];
@@ -123,8 +120,22 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.ilike("agency", `%${sanitizedAgency}%`);
     }
     if (sanitizedAgencySlug) {
-      console.log("🏢 Matching agency slug", { table, agency_slug: sanitizedAgencySlug });
-      q = q.eq("agency_slug", sanitizedAgencySlug);
+      const slugClauses = new Set<string>();
+      const slugCandidates = agencySlugCandidates(sanitizedAgencySlug);
+      for (const code of slugCandidates.codeCandidates) {
+        slugClauses.add(`agency_code.ilike.${escapeIlike(code)}`);
+      }
+      if (slugCandidates.nameFragment) {
+        const pattern = `%${escapeIlike(slugCandidates.nameFragment)}%`;
+        slugClauses.add(`agency_name.ilike.${pattern}`);
+        slugClauses.add(`agency.ilike.${pattern}`);
+      }
+
+      if (slugClauses.size > 0) {
+        const clauseArray = Array.from(slugClauses);
+        console.log("🏢 Matching agency slug", { table, clauses: clauseArray });
+        q = q.or(clauseArray.join(","));
+      }
     }
     if (hasApplyLink) {
       console.log("📝 Filtering to grants with application links", { table });

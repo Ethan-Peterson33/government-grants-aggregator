@@ -290,7 +290,7 @@ export async function getGrantById(id: string): Promise<Grant | null> {
     console.log("⚠️ getGrantById no result in table", {
       table,
       id,
-      dataType: data ? data.constructor?.name ?? typeof data : null,
+      dataType: data === null ? "null" : typeof data,
     });
   }
 

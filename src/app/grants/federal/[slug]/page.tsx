@@ -5,25 +5,34 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
+import {
+  extractSearchParam,
+  resolveRouteParams,
+  resolveSearchParams,
+  type MaybePromise,
+  type SearchParamsLike,
+} from "@/app/grants/_components/route-params";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
 import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 import { inferGrantLocation } from "@/lib/grant-location";
 
-function getSingleParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0];
-  return value;
-}
+type FederalParams = { slug: string };
+
+type FederalSearchParams = SearchParamsLike;
 
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<FederalParams>;
+  searchParams?: MaybePromise<FederalSearchParams>;
 }): Promise<Metadata> {
-  const grant = await loadGrant(params.slug, searchParams);
+  const resolvedParams = await resolveRouteParams(params, "federal.generateMetadata.params");
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     return {
@@ -50,21 +59,35 @@ export default async function FederalGrantDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<FederalParams>;
+  searchParams?: MaybePromise<FederalSearchParams>;
 }) {
-  const grant = await loadGrant(params.slug, searchParams);
+  const resolvedParams = await resolveRouteParams(params, "federal.page.params");
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     notFound();
   }
 
   const canonical = grantPath(grant);
-  const currentId = getSingleParam(searchParams?.id);
-  const currentPath = `/grants/federal/${params.slug}${currentId ? `?id=${encodeURIComponent(currentId)}` : ""}`;
+  const resolvedSearchParams = await resolveSearchParams(searchParams, "federal.page.searchParams");
+  const currentId = extractSearchParam(resolvedSearchParams, "id");
+  const currentSlug = slug ?? null;
 
-  if (currentPath !== canonical) {
-    redirect(canonical);
+  if (currentSlug) {
+    const currentPath = `/grants/federal/${currentSlug}${
+      currentId ? `?id=${encodeURIComponent(currentId)}` : ""
+    }`;
+
+    if (currentPath !== canonical) {
+      redirect(canonical);
+    }
+  } else {
+    console.warn("🧭 FederalGrantDetailPage missing slug; skipping canonical redirect", {
+      context: "federal.page",
+    });
   }
 
   const location = inferGrantLocation(grant);

@@ -254,7 +254,17 @@ export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
 
+  console.log("🧾 getGrantById starting lookup", {
+    id,
+    supabaseClientReady: Boolean(supabase),
+  });
+
   for (const table of TABLE_FALLBACK_ORDER) {
+    console.log("📄 Querying table for grant", {
+      table,
+      id,
+      timestamp: new Date().toISOString(),
+    });
     const { data, error } = (await supabase
       .from(table)
       .select("*")
@@ -268,9 +278,23 @@ export async function getGrantById(id: string): Promise<Grant | null> {
       console.error("❌ getGrantById error:", error);
       break;
     }
-    if (data) return data;
+    if (data) {
+      console.log("✅ getGrantById found grant", {
+        table,
+        id,
+        keys: Object.keys(data ?? {}),
+        titlePreview: data.title?.slice(0, 120) ?? null,
+      });
+      return data;
+    }
+    console.log("⚠️ getGrantById no result in table", {
+      table,
+      id,
+      dataType: data === null ? "null" : typeof data,
+    });
   }
 
+  console.log("🚫 getGrantById grant not found", { id });
   return null;
 }
 
@@ -281,11 +305,14 @@ export async function getGrantByShortId(short: string): Promise<Grant | null> {
   const target = short.trim().toLowerCase();
   if (!target) return null;
 
-  // short === first UUID segment; match "short-%"
+  // short === first UUID segment; match prefix with or without a hyphen.
+  // Some grant IDs are bare UUIDs ("<short>-...") while others are custom
+  // identifiers without a hyphen ("<short>"). We allow both by matching the
+  // lowercase prefix regardless of what character follows it.
   const { data, error } = await supabase
     .from("grants")
     .select("*")
-    .ilike("id", `${target}-%`)   // case-insensitive prefix match
+    .ilike("id", `${target}%`)
     .order("scraped_at", { ascending: false })
     .limit(1)
     .maybeSingle();

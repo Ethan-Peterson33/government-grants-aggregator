@@ -5,6 +5,13 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
+import {
+  extractSearchParam,
+  resolveRouteParams,
+  resolveSearchParams,
+  type MaybePromise,
+  type SearchParamsLike,
+} from "@/app/grants/_components/route-params";
 import { cityNameFromSlug, resolveStateParam } from "@/lib/grant-location";
 import { inferGrantLocation } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
@@ -12,21 +19,26 @@ import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 
-function getSingleParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0];
-  return value;
-}
+type LocalParams = { stateCode: string; citySlug: string; slug: string };
+
+type LocalSearchParams = SearchParamsLike;
 
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; citySlug: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<LocalParams>;
+  searchParams?: MaybePromise<LocalSearchParams>;
 }): Promise<Metadata> {
-  const grant = await loadGrant(params.slug, searchParams);
-  const stateInfo = resolveStateParam(params.stateCode);
-  const cityName = cityNameFromSlug(params.citySlug);
+  const resolvedParams = await resolveRouteParams(params, "local.generateMetadata.params");
+  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
+  const citySlug = typeof resolvedParams?.citySlug === "string" ? resolvedParams.citySlug : "";
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+
+  const stateInfo = resolveStateParam(stateCode);
+  const cityName = cityNameFromSlug(citySlug);
+
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     return {
@@ -53,32 +65,48 @@ export default async function LocalGrantDetailPage({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; citySlug: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<LocalParams>;
+  searchParams?: MaybePromise<LocalSearchParams>;
 }) {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const cityName = cityNameFromSlug(params.citySlug);
-  const grant = await loadGrant(params.slug, searchParams);
+  const resolvedParams = await resolveRouteParams(params, "local.page.params");
+  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
+  const citySlug = typeof resolvedParams?.citySlug === "string" ? resolvedParams.citySlug : "";
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+
+  const stateInfo = resolveStateParam(stateCode);
+  const cityName = cityNameFromSlug(citySlug);
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     notFound();
   }
 
   const canonical = grantPath(grant);
-  const currentId = getSingleParam(searchParams?.id);
-  const currentPath = `/grants/local/${stateInfo.code}/${params.citySlug}/${params.slug}${
-    currentId ? `?id=${encodeURIComponent(currentId)}` : ""
-  }`;
+  const resolvedSearchParams = await resolveSearchParams(searchParams, "local.page.searchParams");
+  const currentId = extractSearchParam(resolvedSearchParams, "id");
+  const currentSlug = slug ?? null;
 
-  if (currentPath !== canonical) {
-    redirect(canonical);
+  if (currentSlug) {
+    const currentPath = `/grants/local/${stateInfo.code}/${citySlug}/${currentSlug}${
+      currentId ? `?id=${encodeURIComponent(currentId)}` : ""
+    }`;
+
+    if (currentPath !== canonical) {
+      redirect(canonical);
+    }
+  } else {
+    console.warn("🧭 LocalGrantDetailPage missing slug; skipping canonical redirect", {
+      context: "local.page",
+      stateCode,
+      citySlug,
+    });
   }
 
   const location = inferGrantLocation(grant);
   if (
     location.jurisdiction !== "local" ||
     location.stateCode.toUpperCase() !== stateInfo.code.toUpperCase() ||
-    location.citySlug !== params.citySlug
+    location.citySlug !== citySlug
   ) {
     redirect(canonical);
   }
@@ -87,7 +115,7 @@ export default async function LocalGrantDetailPage({
     { label: "Home", href: "/" },
     { label: "Grants", href: "/grants" },
     { label: stateInfo.name, href: `/grants/state/${stateInfo.code}` },
-    { label: cityName, href: `/grants/local/${stateInfo.code}/${params.citySlug}` },
+    { label: cityName, href: `/grants/local/${stateInfo.code}/${citySlug}` },
     { label: grant.title, href: canonical },
   ];
 

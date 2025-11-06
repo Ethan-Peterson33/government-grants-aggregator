@@ -136,7 +136,7 @@ export function FiltersBar({
       data-testid="filters-form"
       className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end"
     >
-      <div className="flex-1 space-y-1">
+      <div className="w-full space-y-1 sm:flex-1 sm:max-w-md">
         <label htmlFor="search" className="text-xs font-semibold uppercase text-slate-500">
           Keyword
         </label>

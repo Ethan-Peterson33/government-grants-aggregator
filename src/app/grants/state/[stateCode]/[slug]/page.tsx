@@ -5,6 +5,13 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
+import {
+  extractSearchParam,
+  resolveRouteParams,
+  resolveSearchParams,
+  type MaybePromise,
+  type SearchParamsLike,
+} from "@/app/grants/_components/route-params";
 import { resolveStateParam } from "@/lib/grant-location";
 import { inferGrantLocation } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
@@ -12,20 +19,23 @@ import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 
-function getSingleParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0];
-  return value;
-}
+type StateParams = { stateCode: string; slug: string };
+
+type StateSearchParams = SearchParamsLike;
 
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<StateParams>;
+  searchParams?: MaybePromise<StateSearchParams>;
 }): Promise<Metadata> {
-  const grant = await loadGrant(params.slug, searchParams);
-  const stateInfo = resolveStateParam(params.stateCode);
+  const resolvedParams = await resolveRouteParams(params, "state.generateMetadata.params");
+  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+  const stateInfo = resolveStateParam(stateCode);
+
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     return {
@@ -52,24 +62,38 @@ export default async function StateGrantDetailPage({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; slug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: MaybePromise<StateParams>;
+  searchParams?: MaybePromise<StateSearchParams>;
 }) {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const grant = await loadGrant(params.slug, searchParams);
+  const resolvedParams = await resolveRouteParams(params, "state.page.params");
+  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
+  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+
+  const stateInfo = resolveStateParam(stateCode);
+  const grant = await loadGrant(slug, searchParams);
 
   if (!grant) {
     notFound();
   }
 
   const canonical = grantPath(grant);
-  const currentId = getSingleParam(searchParams?.id);
-  const currentPath = `/grants/state/${stateInfo.code}/${params.slug}${
-    currentId ? `?id=${encodeURIComponent(currentId)}` : ""
-  }`;
+  const resolvedSearchParams = await resolveSearchParams(searchParams, "state.page.searchParams");
+  const currentId = extractSearchParam(resolvedSearchParams, "id");
+  const currentSlug = slug ?? null;
 
-  if (currentPath !== canonical) {
-    redirect(canonical);
+  if (currentSlug) {
+    const currentPath = `/grants/state/${stateInfo.code}/${currentSlug}${
+      currentId ? `?id=${encodeURIComponent(currentId)}` : ""
+    }`;
+
+    if (currentPath !== canonical) {
+      redirect(canonical);
+    }
+  } else {
+    console.warn("🧭 StateGrantDetailPage missing slug; skipping canonical redirect", {
+      context: "state.page",
+      stateCode,
+    });
   }
 
   const location = inferGrantLocation(grant);

@@ -17,6 +17,16 @@ export function grantSlug(title: string, id: string): string {
   return base ? `${base}-${idSegment}` : idSegment;
 }
 
+function withIdQuery(path: string, id: string | null | undefined): string {
+  if (!id || typeof id !== "string") return path;
+
+  const trimmed = id.trim();
+  if (!trimmed) return path;
+
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}id=${encodeURIComponent(trimmed)}`;
+}
+
 // Note: id/title are typed as required, but we still guard inside grantSlug/shortId
 export function grantPath(
   grant: Pick<Grant, "id" | "title" | "category" | "state"> & { city?: string | null }
@@ -26,16 +36,23 @@ export function grantPath(
   // If we somehow still didn’t get a slugValue, fallback to just id
   const finalSlug = slugValue || (typeof grant.id === "string" ? shortId(grant.id) : "item");
   const location = inferGrantLocation(grant);
+  const grantId = typeof grant.id === "string" ? grant.id : "";
 
   if (location.jurisdiction === "federal") {
-    return `/grants/federal/${finalSlug}`;
+    return withIdQuery(`/grants/federal/${finalSlug}`, grantId);
   }
 
   if (location.jurisdiction === "state") {
-    return `/grants/state/${location.stateCode.toUpperCase()}/${finalSlug}`;
+    return withIdQuery(
+      `/grants/state/${location.stateCode.toUpperCase()}/${finalSlug}`,
+      grantId
+    );
   }
 
-  return `/grants/local/${location.stateCode.toUpperCase()}/${location.citySlug}/${finalSlug}`;
+  return withIdQuery(
+    `/grants/local/${location.stateCode.toUpperCase()}/${location.citySlug}/${finalSlug}`,
+    grantId
+  );
 }
 
 export const buildGrantPath = grantPath;

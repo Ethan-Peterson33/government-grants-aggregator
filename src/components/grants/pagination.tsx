@@ -35,6 +35,47 @@ const buttonClasses = (isActive: boolean) =>
       : "bg-white text-slate-900 hover:bg-slate-100"
   }`;
 
+const getPageItems = (
+  totalPages: number,
+  currentPage: number,
+): Array<number | "ellipsis"> => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const includedPages = new Set<number>();
+
+  // Always include the first two and last two pages
+  includedPages.add(1);
+  includedPages.add(2);
+  includedPages.add(totalPages - 1);
+  includedPages.add(totalPages);
+
+  // Include the current page and its immediate neighbors
+  for (let offset = -1; offset <= 1; offset += 1) {
+    const page = currentPage + offset;
+    if (page > 0 && page <= totalPages) {
+      includedPages.add(page);
+    }
+  }
+
+  const sortedPages = Array.from(includedPages).sort((a, b) => a - b);
+
+  const pageItems: Array<number | "ellipsis"> = [];
+  for (let i = 0; i < sortedPages.length; i += 1) {
+    const page = sortedPages[i];
+    const prevPage = sortedPages[i - 1];
+
+    if (i > 0 && page - prevPage > 1) {
+      pageItems.push("ellipsis");
+    }
+
+    pageItems.push(page);
+  }
+
+  return pageItems;
+};
+
 const Pagination: React.FC<PaginationProps> = (props) => {
   const { total, pageSize, currentPage, isLoading } = props;
   const safePageSize = pageSize > 0 ? pageSize : 1;
@@ -44,13 +85,22 @@ const Pagination: React.FC<PaginationProps> = (props) => {
     return null;
   }
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pageItems = getPageItems(totalPages, currentPage);
 
   if ("onPageChange" in props && typeof props.onPageChange === "function") {
     const handlePageChange = props.onPageChange;
     return (
       <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
-        {pageNumbers.map((pageNum) => {
+        {pageItems.map((item, index) => {
+          if (item === "ellipsis") {
+            return (
+              <span key={`ellipsis-${index}`} className="px-3 py-1 text-slate-500">
+                …
+              </span>
+            );
+          }
+
+          const pageNum = item;
           const isActive = pageNum === currentPage;
           return (
             <button
@@ -87,7 +137,16 @@ const Pagination: React.FC<PaginationProps> = (props) => {
 
   return (
     <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
-      {pageNumbers.map((pageNum) => {
+      {pageItems.map((item, index) => {
+        if (item === "ellipsis") {
+          return (
+            <span key={`ellipsis-${index}`} className="px-3 py-1 text-slate-500">
+              …
+            </span>
+          );
+        }
+
+        const pageNum = item;
         const href = buildHref(pageNum);
         const isActive = pageNum === currentPage;
         return (

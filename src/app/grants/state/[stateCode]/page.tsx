@@ -112,7 +112,13 @@ export default async function StateGrantsPage({
           )}
         </div>
         {hasResults && (
-          <Pagination total={total} pageSize={pageSize} currentPage={page} hrefBuilder={buildPageHref} />
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            basePath={`/grants/state/${stateInfo.code}`}
+            rawCategory={rawCategory}
+          />
         )}
       </section>
 

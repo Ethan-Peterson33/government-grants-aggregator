@@ -18,15 +18,38 @@ async function resolveAgency(slug: string, scope: string) {
     return null;
   }
   const normalized = typeof slug === "string" ? slug.trim() : "";
+  console.log({ scope, message: "resolveAgency received slug", slug, normalized });
   if (!normalized) {
     console.error({ scope, message: "Missing slug parameter for agency lookup", slug });
     return null;
   }
-  return findAgencyBySlug(supabase, normalized, { logScope: scope });
+  const agency = await findAgencyBySlug(supabase, normalized, { logScope: scope });
+  if (!agency) {
+    console.warn({ scope, message: "resolveAgency did not find agency", normalized });
+  } else {
+    console.log({
+      scope,
+      message: "resolveAgency resolved agency",
+      normalized,
+      agency: {
+        id: agency.id,
+        slug: agency.slug,
+        agency_code: agency.agency_code,
+        agency_name: agency.agency_name,
+      },
+    });
+  }
+  return agency;
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const agency = await resolveAgency(params.slug, "agency.metadata");
+export async function generateMetadata({
+  params,
+}: {
+  params?: { slug?: string };
+}): Promise<Metadata> {
+  console.log({ scope: "agency.metadata", message: "generateMetadata invoked", params });
+  const slugParam = typeof params?.slug === "string" ? params.slug : "";
+  const agency = await resolveAgency(slugParam, "agency.metadata");
   if (!agency) {
     return { title: "Agency Not Found" };
   }
@@ -40,13 +63,15 @@ export default async function AgencyPage({
   params,
   searchParams,
 }: {
-  params: { slug: string };
+  params?: { slug?: string };
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
+  console.log({ scope: "agency.page", message: "AgencyPage invoked", params, searchParams });
   const page = safeNumber(searchParams?.page, 1);
   const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, DEFAULT_PAGE_SIZE));
 
-  const agency = await resolveAgency(params.slug, "agency.page");
+  const slugParam = typeof params?.slug === "string" ? params.slug : "";
+  const agency = await resolveAgency(slugParam, "agency.page");
   if (!agency) {
     notFound();
   }

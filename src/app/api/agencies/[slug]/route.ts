@@ -10,8 +10,11 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(searchParams.get("pageSize") ?? "12", 10) || 12));
-  const { slug: slugValue } = await context.params;
+  const resolvedParams = await context.params;
+  console.log({ scope: "agency.api", message: "API request params", params: resolvedParams });
+  const { slug: slugValue } = resolvedParams;
   const slug = typeof slugValue === "string" ? slugValue.trim() : "";
+  console.log({ scope: "agency.api", message: "Computed slug value", slugValue, slug });
 
   const supabase = createServerSupabaseClient();
   if (!supabase) {

@@ -20,7 +20,15 @@ export async function loadGrant(
   const grantId = typeof idParam === "string" ? decodeURIComponent(idParam) : undefined;
   const short = extractShortIdFromSlug(slug);
 
+  console.log("🧭 loadGrant params", {
+    slug,
+    idParam,
+    decodedGrantId: grantId,
+    shortIdFromSlug: short,
+  });
+
   if (grantId) {
+    console.log("🔐 Attempting getGrantById", { id: grantId });
     return getGrantById(grantId);
   }
 

@@ -254,7 +254,10 @@ export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
 
+  console.log("🧾 getGrantById starting lookup", { id });
+
   for (const table of TABLE_FALLBACK_ORDER) {
+    console.log("📄 Querying table for grant", { table, id });
     const { data, error } = (await supabase
       .from(table)
       .select("*")
@@ -268,9 +271,14 @@ export async function getGrantById(id: string): Promise<Grant | null> {
       console.error("❌ getGrantById error:", error);
       break;
     }
-    if (data) return data;
+    if (data) {
+      console.log("✅ getGrantById found grant", { table, id });
+      return data;
+    }
+    console.log("⚠️ getGrantById no result in table", { table, id });
   }
 
+  console.log("🚫 getGrantById grant not found", { id });
   return null;
 }
 

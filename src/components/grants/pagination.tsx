@@ -5,35 +5,77 @@
 import Link from "next/link";
 import React from "react";
 
-interface PaginationProps {
+interface PaginationBaseProps {
   total: number;
   pageSize: number;
   currentPage: number;
-  basePath: string;       // e.g. "/grants/federal"
-  rawCategory?: string;    // optional category slug, e.g. "Education"
+  isLoading?: boolean;
 }
 
-const Pagination: React.FC<PaginationProps> = ({
-  total,
-  pageSize,
-  currentPage,
-  basePath,
-  rawCategory,
-}) => {
-  const totalPages = Math.ceil(total / pageSize);
+type PaginationLinkProps = PaginationBaseProps & {
+  basePath: string;
+  rawCategory?: string;
+  onPageChange?: undefined;
+};
+
+type PaginationCallbackProps = PaginationBaseProps & {
+  onPageChange: (page: number) => void;
+  basePath?: undefined;
+  rawCategory?: undefined;
+};
+
+type PaginationProps = PaginationLinkProps | PaginationCallbackProps;
+
+const DEFAULT_PAGE_SIZE = 12;
+
+const buttonClasses = (isActive: boolean) =>
+  `px-3 py-1 border rounded ${
+    isActive
+      ? "bg-slate-900 text-white"
+      : "bg-white text-slate-900 hover:bg-slate-100"
+  }`;
+
+const Pagination: React.FC<PaginationProps> = (props) => {
+  const { total, pageSize, currentPage, isLoading } = props;
+  const safePageSize = pageSize > 0 ? pageSize : 1;
+  const totalPages = Math.ceil(total / safePageSize);
 
   if (totalPages <= 1) {
-    return null; // no pagination needed
+    return null;
   }
 
-  // helper to build query string
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+  if ("onPageChange" in props && typeof props.onPageChange === "function") {
+    const handlePageChange = props.onPageChange;
+    return (
+      <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
+        {pageNumbers.map((pageNum) => {
+          const isActive = pageNum === currentPage;
+          return (
+            <button
+              key={pageNum}
+              type="button"
+              onClick={() => handlePageChange(pageNum)}
+              disabled={isActive || isLoading}
+              className={buttonClasses(isActive)}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
+
+  const { basePath, rawCategory } = props;
+
   const buildHref = (page: number) => {
     const params = new URLSearchParams();
     if (page > 1) {
       params.set("page", String(page));
     }
-    if (pageSize !== pageSize) {
-      // if you allow custom pageSize and want to include only when not default
+    if (pageSize !== DEFAULT_PAGE_SIZE) {
       params.set("pageSize", String(pageSize));
     }
     if (rawCategory) {
@@ -43,10 +85,8 @@ const Pagination: React.FC<PaginationProps> = ({
     return query ? `${basePath}?${query}` : basePath;
   };
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-
   return (
-    <nav aria-label="Pagination" className="flex space-x-2 justify-center mt-6">
+    <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
       {pageNumbers.map((pageNum) => {
         const href = buildHref(pageNum);
         const isActive = pageNum === currentPage;
@@ -54,11 +94,7 @@ const Pagination: React.FC<PaginationProps> = ({
           <Link
             key={pageNum}
             href={href}
-            className={`px-3 py-1 border rounded ${
-              isActive
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-900 hover:bg-slate-100"
-            }`}
+            className={buttonClasses(isActive)}
             aria-current={isActive ? "page" : undefined}
           >
             {pageNum}

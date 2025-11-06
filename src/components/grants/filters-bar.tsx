@@ -26,6 +26,7 @@ type FiltersBarProps = {
   states?: FilterOption[];
   agencies?: FilterOption[];
   isLoading?: boolean;
+  lockedFilters?: Partial<FilterState>;
   onFiltersChange?: (next: FilterState, context: FiltersBarChangeContext) => void;
 };
 
@@ -58,17 +59,47 @@ const areFiltersEqual = (a: FilterState, b: FilterState) =>
   a.agency === b.agency &&
   a.hasApplyLink === b.hasApplyLink;
 
+const computeLockedValues = (locked?: Partial<FilterState>) => {
+  if (!locked) {
+    return { map: undefined as Partial<FilterState> | undefined, keys: new Set<keyof FilterState>() };
+  }
+  const keys = new Set(Object.keys(locked) as (keyof FilterState)[]);
+  if (keys.size === 0) {
+    return { map: undefined as Partial<FilterState> | undefined, keys };
+  }
+  const normalized = normalizeFilters(locked);
+  const map: Partial<FilterState> = {};
+  const writable = map as Record<keyof FilterState, FilterState[keyof FilterState]>;
+  keys.forEach((key) => {
+    writable[key] = normalized[key];
+  });
+  return { map, keys };
+};
+
 export function FiltersBar({
   filters,
   categories = [],
   states = [],
   agencies = [],
   isLoading = false,
+  lockedFilters,
   onFiltersChange,
 }: FiltersBarProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const stateOptions = useMemo(() => (states.length > 0 ? states : DEFAULT_STATE_OPTIONS), [states]);
-  const normalizedFilters = useMemo(() => normalizeFilters(filters), [filters]);
+  const locked = useMemo(() => computeLockedValues(lockedFilters), [lockedFilters]);
+  const normalizedFilters = useMemo(() => {
+    const base = normalizeFilters(filters);
+    if (locked.map) {
+      for (const key of locked.keys) {
+        const value = locked.map[key];
+        if (typeof value === "boolean" || typeof value === "string") {
+          (base as any)[key] = value;
+        }
+      }
+    }
+    return base;
+  }, [filters, locked]);
 
   const [filterState, setFilterState] = useState<FilterState>(normalizedFilters);
 
@@ -106,6 +137,9 @@ export function FiltersBar({
   const handleSelectChange = (key: keyof FilterState) => (event: ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
     setFilterState((current) => {
+      if (locked.keys.has(key)) {
+        return current;
+      }
       const next = { ...current, [key]: value } as FilterState;
       notify(next, "change");
       return next;
@@ -115,6 +149,9 @@ export function FiltersBar({
   const handleCheckboxChange = (event: ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
     setFilterState((current) => {
+      if (locked.keys.has("hasApplyLink")) {
+        return current;
+      }
       const next = { ...current, hasApplyLink: checked };
       notify(next, "change");
       return next;
@@ -158,7 +195,7 @@ export function FiltersBar({
             value={filterState.category}
             onChange={handleSelectChange("category")}
             className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-            disabled={isLoading}
+            disabled={isLoading || locked.keys.has("category")}
           >
             <option value="">All categories</option>
             {categories.map((option) => (
@@ -178,7 +215,7 @@ export function FiltersBar({
           value={filterState.state}
           onChange={handleSelectChange("state")}
           className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-          disabled={isLoading}
+          disabled={isLoading || locked.keys.has("state")}
         >
           <option value="">All states</option>
           {stateOptions.map((option) => (
@@ -193,17 +230,17 @@ export function FiltersBar({
           <label htmlFor="agency" className="text-xs font-semibold uppercase text-slate-500">
             Agency
           </label>
-          <select
-            id="agency"
-            value={filterState.agency}
-            onChange={handleSelectChange("agency")}
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-            disabled={isLoading}
-          >
-            <option value="">All agencies</option>
-            {agencies.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+        <select
+          id="agency"
+          value={filterState.agency}
+          onChange={handleSelectChange("agency")}
+          className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+          disabled={isLoading || locked.keys.has("agency")}
+        >
+          <option value="">All agencies</option>
+          {agencies.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
               </option>
             ))}
           </select>
@@ -215,7 +252,7 @@ export function FiltersBar({
           className="h-4 w-4 rounded border-slate-300"
           checked={filterState.hasApplyLink}
           onChange={handleCheckboxChange}
-          disabled={isLoading}
+          disabled={isLoading || locked.keys.has("hasApplyLink")}
         />
         Has apply link
       </label>

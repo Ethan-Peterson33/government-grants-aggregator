@@ -33,6 +33,7 @@ export type GrantFilters = {
   city?: string;
   agency?: string;
   agencySlug?: string;
+  agencyCode?: string;
   hasApplyLink?: boolean;
   jurisdiction?: GrantJurisdiction;
   page?: number;

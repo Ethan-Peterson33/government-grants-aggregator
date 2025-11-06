@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveAgencySlug } from "@/lib/slug";
 import type { Agency } from "@/lib/types";
 
@@ -16,6 +17,40 @@ export type AgencyRow = {
 
 export function escapeIlike(value: string): string {
   return value.replace(/[%_]/g, (match) => `\\${match}`).replace(/'/g, "''");
+}
+
+const SCOPE_DEFAULT = "agency.lookup";
+
+type SupabaseTableClient = SupabaseClient<any, any, any>;
+
+type FindAgencyOptions = {
+  logScope?: string;
+};
+
+function log(scope: string, level: "info" | "warn" | "error", message: string, payload?: unknown) {
+  const entry = { scope, message, payload };
+  if (level === "error") {
+    console.error(entry);
+  } else if (level === "warn") {
+    console.warn(entry);
+  } else {
+    console.log(entry);
+  }
+}
+
+function slugWordsPattern(slug: string): string {
+  const tokens = slug
+    .split(/[-\s]+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => escapeIlike(token));
+  if (tokens.length === 0) return "";
+  return `%${tokens.join("%")}%`;
+}
+
+function withPercent(value: string): string {
+  const sanitized = escapeIlike(value);
+  return `%${sanitized}%`;
 }
 
 export function agencySlugCandidates(slug: string) {
@@ -87,6 +122,183 @@ export function agencyGrantFilterClauses(agency: Agency) {
   }
 
   return Array.from(clauses);
+}
+
+async function findAgencyViaTable(
+  supabase: SupabaseTableClient,
+  table: "agencies" | "grants",
+  orClauses: string[],
+  scope: string,
+  debugLabel: string,
+): Promise<AgencyRow | null> {
+  if (!orClauses.length) return null;
+
+  log(scope, "info", `Querying ${table} using ${debugLabel}`, {
+    table,
+    clauseCount: orClauses.length,
+  });
+
+  const query = supabase
+    .from(table)
+    .select(table === "agencies" ? "*" : "agency_code, agency_name, agency")
+    .or(orClauses.join(","))
+    .order(table === "agencies" ? "updated_at" : "scraped_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data, error } = (await query) as unknown as {
+    data: AgencyRow | { agency_code?: string | null; agency_name?: string | null; agency?: string | null } | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    log(scope, "error", `Query against ${table} failed`, { error, debugLabel });
+    return null;
+  }
+
+  if (!data) {
+    log(scope, "info", `No match found in ${table}`, { debugLabel });
+    return null;
+  }
+
+  if (table === "agencies") {
+    return data as AgencyRow;
+  }
+
+  const grantRow = data as { agency_code?: string | null; agency_name?: string | null; agency?: string | null };
+  return {
+    id: grantRow.agency_code ?? undefined,
+    agency_code: grantRow.agency_code ?? null,
+    agency_name: grantRow.agency_name ?? grantRow.agency ?? null,
+  } as AgencyRow;
+}
+
+async function findAgencyByName(
+  supabase: SupabaseTableClient,
+  slug: string,
+  scope: string,
+): Promise<AgencyRow | null> {
+  const candidates = agencySlugCandidates(slug);
+  const patterns = new Set<string>();
+  if (candidates.nameFragment) {
+    patterns.add(withPercent(candidates.nameFragment));
+  }
+  const slugPattern = slugWordsPattern(slug);
+  if (slugPattern) {
+    patterns.add(slugPattern);
+  }
+  if (patterns.size === 0) return null;
+
+  const orClauses = Array.from(patterns).flatMap((pattern) => [
+    `agency_name.ilike.${pattern}`,
+    `agency.ilike.${pattern}`,
+  ]);
+
+  const fromAgencies = await findAgencyViaTable(supabase, "agencies", orClauses, scope, "name-match-agencies");
+  if (fromAgencies) {
+    log(scope, "info", "Matched agency via agencies table name", {
+      slug,
+      agency_code: fromAgencies.agency_code ?? null,
+    });
+    return fromAgencies;
+  }
+
+  const fromGrants = await findAgencyViaTable(supabase, "grants", orClauses, scope, "name-match-grants");
+  if (fromGrants) {
+    log(scope, "info", "Matched agency via grants table name", {
+      slug,
+      agency_code: fromGrants.agency_code ?? null,
+    });
+    return fromGrants;
+  }
+
+  return null;
+}
+
+async function findAgencyByCode(
+  supabase: SupabaseTableClient,
+  slug: string,
+  scope: string,
+): Promise<AgencyRow | null> {
+  const candidates = agencySlugCandidates(slug);
+  if (candidates.codeCandidates.length === 0) return null;
+
+  const clauses = new Set<string>();
+  for (const code of candidates.codeCandidates) {
+    if (!code) continue;
+    const sanitized = escapeIlike(code);
+    clauses.add(`agency_code.ilike.${sanitized}`);
+    clauses.add(`agency_code.ilike.%${sanitized}%`);
+  }
+
+  const clauseArray = Array.from(clauses);
+  const fromAgencies = await findAgencyViaTable(supabase, "agencies", clauseArray, scope, "code-match-agencies");
+  if (fromAgencies) {
+    log(scope, "info", "Matched agency via agencies table code", {
+      slug,
+      agency_code: fromAgencies.agency_code ?? null,
+    });
+    return fromAgencies;
+  }
+
+  const fromGrants = await findAgencyViaTable(supabase, "grants", clauseArray, scope, "code-match-grants");
+  if (fromGrants) {
+    log(scope, "info", "Matched agency via grants table code", {
+      slug,
+      agency_code: fromGrants.agency_code ?? null,
+    });
+    return fromGrants;
+  }
+
+  return null;
+}
+
+export async function findAgencyBySlug(
+  supabase: SupabaseTableClient | undefined,
+  slug: string,
+  options: FindAgencyOptions = {},
+): Promise<Agency | null> {
+  const scope = options.logScope ?? SCOPE_DEFAULT;
+
+  if (!supabase) {
+    log(scope, "warn", "Supabase client unavailable for lookup", { slug });
+    return null;
+  }
+
+  const normalizedSlug = typeof slug === "string" ? slug.trim().toLowerCase() : "";
+  if (!normalizedSlug) {
+    log(scope, "warn", "Cannot lookup agency without slug", { slug });
+    return null;
+  }
+
+  log(scope, "info", "Starting agency lookup", { slug: normalizedSlug });
+
+  const byCode = await findAgencyByCode(supabase, normalizedSlug, scope);
+  if (byCode) {
+    const normalized = toAgency(byCode, normalizedSlug);
+    if (normalized) {
+      log(scope, "info", "Agency lookup succeeded via code", {
+        slug: normalized.slug,
+        agency_code: normalized.agency_code,
+      });
+      return normalized;
+    }
+  }
+
+  const byName = await findAgencyByName(supabase, normalizedSlug, scope);
+  if (byName) {
+    const normalized = toAgency(byName, normalizedSlug);
+    if (normalized) {
+      log(scope, "info", "Agency lookup succeeded via name", {
+        slug: normalized.slug,
+        agency_code: normalized.agency_code,
+      });
+      return normalized;
+    }
+  }
+
+  log(scope, "warn", "Agency lookup failed for slug", { slug: normalizedSlug });
+  return null;
 }
 
 function coalesceSlug(

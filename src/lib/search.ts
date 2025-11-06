@@ -49,6 +49,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     typeof filters.agencySlug === "string" && filters.agencySlug.trim().length > 0
       ? filters.agencySlug.trim().toLowerCase()
       : undefined;
+  const sanitizedAgencyCode =
+    typeof filters.agencyCode === "string" && filters.agencyCode.trim().length > 0
+      ? filters.agencyCode.trim()
+      : undefined;
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
@@ -62,6 +66,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     sanitizedCity,
     sanitizedAgency,
     sanitizedAgencySlug,
+    sanitizedAgencyCode,
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
@@ -118,6 +123,21 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     if (sanitizedAgency) {
       console.log("🏢 Matching agency fragment", { table, agency: sanitizedAgency });
       q = q.ilike("agency", `%${sanitizedAgency}%`);
+    }
+    if (sanitizedAgencyCode) {
+      const codeCandidates = agencySlugCandidates(sanitizedAgencyCode);
+      const codeClauses = new Set<string>();
+      for (const code of codeCandidates.codeCandidates) {
+        if (!code) continue;
+        const sanitized = escapeIlike(code);
+        codeClauses.add(`agency_code.ilike.${sanitized}`);
+        codeClauses.add(`agency_code.ilike.%${sanitized}%`);
+      }
+      if (codeClauses.size > 0) {
+        const clauseArray = Array.from(codeClauses);
+        console.log("🏢 Matching agency code", { table, clauses: clauseArray });
+        q = q.or(clauseArray.join(","));
+      }
     }
     if (sanitizedAgencySlug) {
       const slugClauses = new Set<string>();

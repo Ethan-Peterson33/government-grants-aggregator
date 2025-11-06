@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { FiltersBar, type FilterOption, type FilterState, type FiltersBarChangeContext } from "@/components/grants/filters-bar";
+import {
+  FiltersBar,
+  type FilterOption,
+  type FilterState,
+  type FiltersBarChangeContext,
+} from "@/components/grants/filters-bar";
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
 import type { SearchResult } from "@/lib/search";
@@ -10,16 +15,24 @@ import type { Grant } from "@/lib/types";
 
 const DEFAULT_PAGE_SIZE = 12;
 
+type LockedAgency = {
+  label: string;
+  slug: string;
+  code?: string | null | undefined;
+};
+
 export type GrantsSearchClientProps = {
   initialFilters: Partial<FilterState & { page: number; pageSize: number }>;
   initialResults: SearchResult;
   categories: FilterOption[];
   states: FilterOption[];
   agencies: FilterOption[];
+  lockedAgency?: LockedAgency;
 };
 
 type CanonicalOptions = {
   includeDefaults?: boolean;
+  additionalParams?: Record<string, string | undefined>;
 };
 
 type NormalizedFilters = FilterState;
@@ -43,7 +56,7 @@ export const serializeFilters = (
   filters: NormalizedFilters,
   page: number,
   pageSize: number,
-  options: CanonicalOptions = {}
+  options: CanonicalOptions = {},
 ): URLSearchParams => {
   const params = new URLSearchParams();
   const keyword = filters.query.trim();
@@ -61,6 +74,14 @@ export const serializeFilters = (
     if (pageSize !== DEFAULT_PAGE_SIZE) params.set("pageSize", String(pageSize));
   }
 
+  if (options.additionalParams) {
+    for (const [key, value] of Object.entries(options.additionalParams)) {
+      if (typeof value === "string" && value.trim().length > 0) {
+        params.set(key, value.trim());
+      }
+    }
+  }
+
   return params;
 };
 
@@ -70,13 +91,39 @@ export function GrantsSearchClient({
   categories,
   states,
   agencies,
+  lockedAgency,
 }: GrantsSearchClientProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
+    if (!lockedAgency) return undefined;
+    return { agency: lockedAgency.label };
+  }, [lockedAgency]);
+
+  const lockedKeys = useMemo(
+    () => new Set((lockedFilterValues ? Object.keys(lockedFilterValues) : []) as (keyof FilterState)[]),
+    [lockedFilterValues]
+  );
+
+  const mergeLockedFilters = useCallback(
+    (filters: NormalizedFilters): NormalizedFilters => {
+      if (!lockedFilterValues) return filters;
+      const next = { ...filters };
+      for (const key of lockedKeys) {
+        const value = lockedFilterValues[key];
+        if (typeof value === "boolean" || typeof value === "string") {
+          (next as any)[key] = value;
+        }
+      }
+      return next;
+    },
+    [lockedFilterValues, lockedKeys]
+  );
+
   const startingFilters = useMemo(
-    () => normalizeFilters(initialFilters),
-    [initialFilters]
+    () => mergeLockedFilters(normalizeFilters({ ...initialFilters, ...(lockedFilterValues ?? {}) })),
+    [initialFilters, lockedFilterValues, mergeLockedFilters]
   );
 
   const [appliedFilters, setAppliedFilters] = useState<NormalizedFilters>(startingFilters);
@@ -88,24 +135,40 @@ export function GrantsSearchClient({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const additionalParams = useMemo(() => {
+    if (!lockedAgency) return undefined;
+    const extra: Record<string, string> = { agency_slug: lockedAgency.slug };
+    if (lockedAgency.code) {
+      extra.agency_code = lockedAgency.code;
+    }
+    return extra;
+  }, [lockedAgency]);
+
   const updateUrl = useCallback(
     (filters: NormalizedFilters, nextPage: number, nextPageSize: number) => {
-      const params = serializeFilters(filters, nextPage, nextPageSize, { includeDefaults: false });
+      const params = serializeFilters(filters, nextPage, nextPageSize, {
+        includeDefaults: false,
+        additionalParams,
+      });
       const search = params.toString();
       router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
     },
-    [pathname, router]
+    [additionalParams, pathname, router]
   );
 
   const performSearch = useCallback(
     async (filters: NormalizedFilters, nextPage: number) => {
+      const effectiveFilters = mergeLockedFilters(filters);
       const nextPageSize = pageSize || DEFAULT_PAGE_SIZE;
-      updateUrl(filters, nextPage, nextPageSize);
+      updateUrl(effectiveFilters, nextPage, nextPageSize);
       setIsLoading(true);
       setError(null);
 
       try {
-        const requestParams = serializeFilters(filters, nextPage, nextPageSize, { includeDefaults: true });
+        const requestParams = serializeFilters(effectiveFilters, nextPage, nextPageSize, {
+          includeDefaults: true,
+          additionalParams,
+        });
         const response = await fetch(`/api/grants/search?${requestParams.toString()}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
@@ -121,7 +184,7 @@ export function GrantsSearchClient({
         setPage(data.page);
         setPageSize(data.pageSize);
         setTotalPages(data.totalPages);
-        setAppliedFilters(filters);
+        setAppliedFilters(effectiveFilters);
       } catch (err) {
         console.error("Grant search failed", err);
         setResults([]);
@@ -133,12 +196,12 @@ export function GrantsSearchClient({
         setIsLoading(false);
       }
     },
-    [pageSize, updateUrl]
+    [additionalParams, mergeLockedFilters, pageSize, updateUrl]
   );
 
   const handleFiltersChange = useCallback(
     (next: FilterState, context: FiltersBarChangeContext) => {
-      const normalized = normalizeFilters(next);
+      const normalized = mergeLockedFilters(normalizeFilters(next));
       const targetPage = 1;
       if (context.reason === "submit" || context.reason === "change" || context.reason === "debounced") {
         if (areFiltersEqual(normalized, appliedFilters) && targetPage === page) {
@@ -147,7 +210,7 @@ export function GrantsSearchClient({
         void performSearch(normalized, targetPage);
       }
     },
-    [appliedFilters, page, performSearch]
+    [appliedFilters, mergeLockedFilters, page, performSearch]
   );
 
   const handlePageChange = useCallback(
@@ -169,6 +232,7 @@ export function GrantsSearchClient({
         states={states}
         agencies={agencies}
         isLoading={isLoading}
+        lockedFilters={lockedFilterValues}
         onFiltersChange={handleFiltersChange}
       />
 

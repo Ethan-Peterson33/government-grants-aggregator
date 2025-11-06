@@ -9,6 +9,24 @@ import { findAgencyBySlug } from "@/lib/agency";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
+type RouteParams = { slug?: string };
+type RouteSearchParams = Record<string, string | string[] | undefined>;
+
+type MaybePromise<T> = T | Promise<T>;
+
+async function resolveMaybePromise<T>(
+  value?: MaybePromise<T>,
+  scope: string = "agency.page",
+): Promise<T | undefined> {
+  if (typeof value === "undefined") return undefined;
+  try {
+    return await value;
+  } catch (error) {
+    console.error({ scope, message: "Failed to resolve route argument", error });
+    return undefined;
+  }
+}
+
 const DEFAULT_PAGE_SIZE = 12;
 
 async function resolveAgency(slug: string, scope: string) {
@@ -45,10 +63,12 @@ async function resolveAgency(slug: string, scope: string) {
 export async function generateMetadata({
   params,
 }: {
-  params?: { slug?: string };
+  params?: MaybePromise<RouteParams>;
 }): Promise<Metadata> {
   console.log({ scope: "agency.metadata", message: "generateMetadata invoked", params });
-  const slugParam = typeof params?.slug === "string" ? params.slug : "";
+  const resolvedParams = await resolveMaybePromise(params, "agency.metadata");
+  console.log({ scope: "agency.metadata", message: "generateMetadata resolved params", resolvedParams });
+  const slugParam = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : "";
   const agency = await resolveAgency(slugParam, "agency.metadata");
   if (!agency) {
     return { title: "Agency Not Found" };
@@ -63,14 +83,23 @@ export default async function AgencyPage({
   params,
   searchParams,
 }: {
-  params?: { slug?: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params?: MaybePromise<RouteParams>;
+  searchParams?: MaybePromise<RouteSearchParams>;
 }) {
   console.log({ scope: "agency.page", message: "AgencyPage invoked", params, searchParams });
-  const page = safeNumber(searchParams?.page, 1);
-  const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, DEFAULT_PAGE_SIZE));
+  const resolvedParams = await resolveMaybePromise(params, "agency.page");
+  const resolvedSearchParams = await resolveMaybePromise(searchParams, "agency.page");
+  console.log({
+    scope: "agency.page",
+    message: "AgencyPage resolved routing data",
+    resolvedParams,
+    resolvedSearchParams,
+  });
 
-  const slugParam = typeof params?.slug === "string" ? params.slug : "";
+  const page = safeNumber(resolvedSearchParams?.page, 1);
+  const pageSize = Math.min(50, safeNumber(resolvedSearchParams?.pageSize, DEFAULT_PAGE_SIZE));
+
+  const slugParam = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : "";
   const agency = await resolveAgency(slugParam, "agency.page");
   if (!agency) {
     notFound();

@@ -56,3 +56,35 @@ export function grantPath(
 }
 
 export const buildGrantPath = grantPath;
+
+type MaybeString = string | null | undefined;
+
+function normalizeCandidate(value: MaybeString): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return trimmed;
+}
+
+export function deriveAgencySlug(
+  candidates: {
+    slug?: MaybeString;
+    agency_code?: MaybeString;
+    agency_name?: MaybeString;
+    agency?: MaybeString;
+  } = {}
+): string {
+  const ordered = [
+    normalizeCandidate(candidates.slug),
+    normalizeCandidate(candidates.agency_code),
+    normalizeCandidate(candidates.agency_name),
+    normalizeCandidate(candidates.agency),
+  ];
+
+  for (const value of ordered) {
+    if (value) {
+      return slugify(value);
+    }
+  }
+
+  return "";
+}

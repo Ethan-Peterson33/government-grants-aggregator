@@ -6,6 +6,7 @@ import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
+import { slugify } from "@/lib/strings";
 
 const PAGE_SIZE = 12;
 
@@ -90,10 +91,18 @@ export default async function GrantsIndexPage({
 
   const relatedLinks = [
     categoryOptions[0] && categoryOptions[0].value !== category
-      ? {
-          label: `${categoryOptions[0].label} grants`,
-          href: `/grants?category=${encodeURIComponent(categoryOptions[0].value)}`,
-        }
+      ? (() => {
+          const slug = slugify(categoryOptions[0].value);
+          return slug
+            ? {
+                label: `${categoryOptions[0].label} grants`,
+                href: `/grants/category/${slug}`,
+              }
+            : {
+                label: `${categoryOptions[0].label} grants`,
+                href: `/grants?category=${encodeURIComponent(categoryOptions[0].value)}`,
+              };
+        })()
       : null,
     stateOptions[0] && stateOptions[0].value !== state
       ? {
@@ -102,10 +111,18 @@ export default async function GrantsIndexPage({
         }
       : null,
     agencyOptions[0] && agencyOptions[0].value !== agency
-      ? {
-          label: `Programs from ${agencyOptions[0].label}`,
-          href: `/grants?agency=${encodeURIComponent(agencyOptions[0].value)}`,
-        }
+      ? (() => {
+          const slug = slugify(agencyOptions[0].value);
+          return slug
+            ? {
+                label: `Programs from ${agencyOptions[0].label}`,
+                href: `/agencies/${slug}`,
+              }
+            : {
+                label: `Programs from ${agencyOptions[0].label}`,
+                href: `/grants?agency=${encodeURIComponent(agencyOptions[0].value)}`,
+              };
+        })()
       : null,
   ].filter((link): link is { label: string; href: string } => Boolean(link));
 

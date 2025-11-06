@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { grantPath } from "@/lib/slug";
+import { deriveAgencySlug, grantPath } from "@/lib/slug";
+import { slugify } from "@/lib/strings";
 import type { Grant } from "@/lib/types";
 
 function stripHtml(html: string): string {
@@ -22,6 +23,12 @@ export function GrantCard({ grant }: { grant: Grant }) {
   const href = grantPath(grant);
   const locationParts = [grant.city, grant.state].filter(Boolean);
   const summary = getSummary(grant);
+  const agencyName = grant.agency_name ?? grant.agency ?? null;
+  const agencySlug =
+    grant.agency_slug ??
+    deriveAgencySlug({ agency_code: grant.agency_code, agency_name: agencyName ?? null });
+  const categoryLabel = grant.category ?? grant.category_code ?? null;
+  const categorySlug = categoryLabel ? slugify(categoryLabel) : "";
 
   return (
     <Card>
@@ -32,17 +39,35 @@ export function GrantCard({ grant }: { grant: Grant }) {
           </Link>
         </CardTitle>
         <CardDescription className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          {grant.agency && <span className="font-medium text-slate-700">{grant.agency}</span>}
+          {agencyName && agencySlug ? (
+            <Link
+              href={`/agencies/${agencySlug}`}
+              className="font-medium text-slate-700 hover:text-blue-700"
+            >
+              {agencyName}
+            </Link>
+          ) : (
+            agencyName && <span className="font-medium text-slate-700">{agencyName}</span>
+          )}
           {locationParts.length > 0 && (
             <>
-              {grant.agency && <span aria-hidden="true">•</span>}
+              {agencyName && <span aria-hidden="true">•</span>}
               <span>{locationParts.join(", ")}</span>
             </>
           )}
-          {grant.category && (
+          {categoryLabel && (
             <>
-              {(grant.agency || locationParts.length > 0) && <span aria-hidden="true">•</span>}
-              <span>{grant.category}</span>
+              {(agencyName || locationParts.length > 0) && <span aria-hidden="true">•</span>}
+              {categorySlug ? (
+                <Link
+                  href={`/grants/category/${categorySlug}`}
+                  className="hover:text-blue-700"
+                >
+                  {categoryLabel}
+                </Link>
+              ) : (
+                <span>{categoryLabel}</span>
+              )}
             </>
           )}
         </CardDescription>

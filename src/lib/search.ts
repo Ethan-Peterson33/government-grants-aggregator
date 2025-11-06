@@ -1,4 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
   STATEWIDE_CITY_LABELS,
@@ -6,14 +7,11 @@ import {
   normalizeStateCode,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
+import { deriveAgencySlug } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
-
-function escapeIlike(value: string): string {
-  return value.replace(/[%_]/g, (m) => `\\${m}`).replace(/'/g, "''");
-}
 
 export function safeNumber(value: string | string[] | undefined, fallback: number) {
   if (Array.isArray(value)) value = value[0];
@@ -47,6 +45,14 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const sanitizedState = like(filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
+  const sanitizedAgencySlug =
+    typeof filters.agencySlug === "string" && filters.agencySlug.trim().length > 0
+      ? filters.agencySlug.trim().toLowerCase()
+      : undefined;
+  const sanitizedAgencyCode =
+    typeof filters.agencyCode === "string" && filters.agencyCode.trim().length > 0
+      ? filters.agencyCode.trim()
+      : undefined;
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
@@ -59,6 +65,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     sanitizedState,
     sanitizedCity,
     sanitizedAgency,
+    sanitizedAgencySlug,
+    sanitizedAgencyCode,
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
@@ -116,6 +124,39 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       console.log("🏢 Matching agency fragment", { table, agency: sanitizedAgency });
       q = q.ilike("agency", `%${sanitizedAgency}%`);
     }
+    if (sanitizedAgencyCode) {
+      const codeCandidates = agencySlugCandidates(sanitizedAgencyCode);
+      const codeClauses = new Set<string>();
+      for (const code of codeCandidates.codeCandidates) {
+        if (!code) continue;
+        const sanitized = escapeIlike(code);
+        codeClauses.add(`agency_code.ilike.${sanitized}`);
+        codeClauses.add(`agency_code.ilike.%${sanitized}%`);
+      }
+      if (codeClauses.size > 0) {
+        const clauseArray = Array.from(codeClauses);
+        console.log("🏢 Matching agency code", { table, clauses: clauseArray });
+        q = q.or(clauseArray.join(","));
+      }
+    }
+    if (sanitizedAgencySlug) {
+      const slugClauses = new Set<string>();
+      const slugCandidates = agencySlugCandidates(sanitizedAgencySlug);
+      for (const code of slugCandidates.codeCandidates) {
+        slugClauses.add(`agency_code.ilike.${escapeIlike(code)}`);
+      }
+      if (slugCandidates.nameFragment) {
+        const pattern = `%${escapeIlike(slugCandidates.nameFragment)}%`;
+        slugClauses.add(`agency_name.ilike.${pattern}`);
+        slugClauses.add(`agency.ilike.${pattern}`);
+      }
+
+      if (slugClauses.size > 0) {
+        const clauseArray = Array.from(slugClauses);
+        console.log("🏢 Matching agency slug", { table, clauses: clauseArray });
+        q = q.or(clauseArray.join(","));
+      }
+    }
     if (hasApplyLink) {
       console.log("📝 Filtering to grants with application links", { table });
       q = q.not("apply_link", "is", null);
@@ -162,7 +203,24 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       break;
     }
 
-    const grants = data ?? [];
+    const grants = (data ?? []).map((grant) => {
+      const agencyName = grant.agency_name ?? grant.agency ?? null;
+      const categoryLabel = grant.category ?? grant.category_code ?? null;
+      const fallbackSlug = deriveAgencySlug({
+        slug: grant.agency_slug ?? undefined,
+        agency_code: grant.agency_code ?? undefined,
+        agency_name: agencyName,
+        agency: grant.agency ?? undefined,
+      });
+      return {
+        ...grant,
+        agency: agencyName,
+        agency_name: agencyName,
+        agency_slug: fallbackSlug || null,
+        category: categoryLabel,
+        category_code: grant.category_code ?? null,
+      };
+    });
     const total = count ?? grants.length;
     console.log("⬅️ Query result summary", {
       table,
@@ -236,7 +294,11 @@ export function filterGrantsLocally(
   const pageSize = filters.pageSize && filters.pageSize > 0 ? Math.min(filters.pageSize, 50) : defaultPageSize;
 
   const filtered = grants.filter((grant) => grantMatchesFilters(grant, filters));
-  const sorted = filtered.sort((a, b) => (a.scraped_at > b.scraped_at ? -1 : 1));
+  const sorted = filtered.sort((a, b) => {
+    const aKey = a.scraped_at ?? "";
+    const bKey = b.scraped_at ?? "";
+    return aKey > bKey ? -1 : 1;
+  });
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
   const paginated = sorted.slice(from, to);

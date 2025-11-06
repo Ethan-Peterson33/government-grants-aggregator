@@ -281,11 +281,14 @@ export async function getGrantByShortId(short: string): Promise<Grant | null> {
   const target = short.trim().toLowerCase();
   if (!target) return null;
 
-  // short === first UUID segment; match "short-%"
+  // short === first UUID segment; match prefix with or without a hyphen.
+  // Some grant IDs are bare UUIDs ("<short>-...") while others are custom
+  // identifiers without a hyphen ("<short>"). We allow both by matching the
+  // lowercase prefix regardless of what character follows it.
   const { data, error } = await supabase
     .from("grants")
     .select("*")
-    .ilike("id", `${target}-%`)   // case-insensitive prefix match
+    .ilike("id", `${target}%`)
     .order("scraped_at", { ascending: false })
     .limit(1)
     .maybeSingle();

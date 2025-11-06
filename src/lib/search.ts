@@ -6,7 +6,6 @@ import {
   normalizeStateCode,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
-import { shortId } from "@/lib/slug";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
@@ -52,8 +51,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const hasApplyLink = filters.hasApplyLink === true;
 
   const hasExplicitLocationFilter = Boolean(stateCode || sanitizedState || sanitizedCity);
-  const jurisdiction =
-    filters.jurisdiction ?? (hasExplicitLocationFilter ? undefined : ("federal" as const));
+  const jurisdiction = filters.jurisdiction ?? undefined;
 
   console.log("➡️ Final grant query filters", {
     sanitizedQuery,
@@ -64,6 +62,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
+    hasExplicitLocationFilter,
+    page,
+    pageSize,
+    range: { from, to },
   });
 
   for (const table of TABLE_FALLBACK_ORDER) {
@@ -73,10 +75,16 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       .order("scraped_at", { ascending: false })
       .range(from, to);
 
-    if (sanitizedQuery)
-      q = q.or(
-        `(title.ilike.%${sanitizedQuery}%,summary.ilike.%${sanitizedQuery}%,description.ilike.%${sanitizedQuery}%)`
+    if (sanitizedQuery) {
+      const queryOrClauses = ["title", "summary", "description"].map(
+        (field) => `${field}.ilike.%${sanitizedQuery}%`
       );
+      console.log("🔎 Applying keyword search across fields", {
+        table,
+        clauses: queryOrClauses,
+      });
+      q = q.or(queryOrClauses.join(","));
+    }
     if (sanitizedCategory) q = q.ilike("category", `%${sanitizedCategory}%`);
 
     if (stateCode) {
@@ -86,14 +94,32 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       const clauses = candidateClauses.length
         ? candidateClauses
         : [`state.ilike.%${escapeIlike(stateCode)}%`];
+      console.log("🌎 Matching state code candidates", {
+        table,
+        stateCode,
+        clauses,
+      });
       q = q.or(clauses.join(","));
     } else if (sanitizedState) {
+      console.log("🌎 Matching state fragment", {
+        table,
+        state: sanitizedState,
+      });
       q = q.ilike("state", `%${sanitizedState}%`);
     }
 
-    if (sanitizedCity) q = q.ilike("city", `%${sanitizedCity}%`);
-    if (sanitizedAgency) q = q.ilike("agency", `%${sanitizedAgency}%`);
-    if (hasApplyLink) q = q.not("apply_link", "is", null);
+    if (sanitizedCity) {
+      console.log("🏙️ Matching city fragment", { table, city: sanitizedCity });
+      q = q.ilike("city", `%${sanitizedCity}%`);
+    }
+    if (sanitizedAgency) {
+      console.log("🏢 Matching agency fragment", { table, agency: sanitizedAgency });
+      q = q.ilike("agency", `%${sanitizedAgency}%`);
+    }
+    if (hasApplyLink) {
+      console.log("📝 Filtering to grants with application links", { table });
+      q = q.not("apply_link", "is", null);
+    }
 
     if (jurisdiction === "federal") {
       const orClauses = ["state.is.null"];
@@ -101,6 +127,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         const sanitizedLabel = escapeIlike(label);
         orClauses.push(`state.ilike.%${sanitizedLabel}%`);
       }
+      console.log("🏛️ Applying federal jurisdiction filter", {
+        table,
+        clauses: orClauses,
+      });
       q = q.or(orClauses.join(","));
     } else if (jurisdiction === "state") {
       const cityClauses = ["city.is.null"];
@@ -108,8 +138,13 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         const sanitizedLabel = escapeIlike(label);
         cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
       }
+      console.log("🗺️ Applying state jurisdiction filter", {
+        table,
+        clauses: cityClauses,
+      });
       q = q.or(cityClauses.join(","));
     } else if (jurisdiction === "local") {
+      console.log("🏘️ Applying local jurisdiction filter", { table });
       q = q.not("city", "is", null).not("city", "eq", "");
       for (const label of STATEWIDE_CITY_LABELS) {
         q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
@@ -129,6 +164,13 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     const grants = data ?? [];
     const total = count ?? grants.length;
+    console.log("⬅️ Query result summary", {
+      table,
+      total,
+      returned: grants.length,
+      page,
+      pageSize,
+    });
     return {
       grants,
       total,

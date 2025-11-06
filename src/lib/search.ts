@@ -13,6 +13,7 @@ import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
+/** Safely parse numeric query params */
 export function safeNumber(value: string | string[] | undefined, fallback: number) {
   if (Array.isArray(value)) value = value[0];
   const n = Number(value);
@@ -27,6 +28,7 @@ export type SearchResult = {
   totalPages: number;
 };
 
+/** Main search function */
 export async function searchGrants(filters: GrantFilters = {}): Promise<SearchResult> {
   const supabase = createServerSupabaseClient();
   if (!supabase)
@@ -53,10 +55,9 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     typeof filters.agencyCode === "string" && filters.agencyCode.trim().length > 0
       ? filters.agencyCode.trim()
       : undefined;
+
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
-
-  const hasExplicitLocationFilter = Boolean(stateCode || sanitizedState || sanitizedCity);
   const jurisdiction = filters.jurisdiction ?? undefined;
 
   console.log("➡️ Final grant query filters", {
@@ -70,7 +71,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
-    hasExplicitLocationFilter,
     page,
     pageSize,
     range: { from, to },
@@ -83,18 +83,19 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       .order("scraped_at", { ascending: false })
       .range(from, to);
 
+    /** Keyword search */
     if (sanitizedQuery) {
       const queryOrClauses = ["title", "summary", "description"].map(
         (field) => `${field}.ilike.%${sanitizedQuery}%`
       );
-      console.log("🔎 Applying keyword search across fields", {
-        table,
-        clauses: queryOrClauses,
-      });
+      console.log("🔎 Applying keyword search", { table, clauses: queryOrClauses });
       q = q.or(queryOrClauses.join(","));
     }
+
+    /** Category filter */
     if (sanitizedCategory) q = q.ilike("category", `%${sanitizedCategory}%`);
 
+    /** State filter */
     if (stateCode) {
       const candidateClauses = stateNameCandidatesFromCode(stateCode).map(
         (candidate) => `state.ilike.%${escapeIlike(candidate)}%`
@@ -102,76 +103,65 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       const clauses = candidateClauses.length
         ? candidateClauses
         : [`state.ilike.%${escapeIlike(stateCode)}%`];
-      console.log("🌎 Matching state code candidates", {
-        table,
-        stateCode,
-        clauses,
-      });
+      console.log("🌎 Matching state code candidates", { table, stateCode, clauses });
       q = q.or(clauses.join(","));
     } else if (sanitizedState) {
-      console.log("🌎 Matching state fragment", {
-        table,
-        state: sanitizedState,
-      });
+      console.log("🌎 Matching state fragment", { table, state: sanitizedState });
       q = q.ilike("state", `%${sanitizedState}%`);
     }
 
+    /** City filter */
     if (sanitizedCity) {
       console.log("🏙️ Matching city fragment", { table, city: sanitizedCity });
       q = q.ilike("city", `%${sanitizedCity}%`);
     }
+
+    /** ✅ Combined Agency Filters */
+    const agencyClauses: string[] = [];
+
     if (sanitizedAgency) {
-      console.log("🏢 Matching agency fragment", { table, agency: sanitizedAgency });
-      q = q.ilike("agency", `%${sanitizedAgency}%`);
+      agencyClauses.push(`agency.ilike.%${escapeIlike(sanitizedAgency)}%`);
+      agencyClauses.push(`agency_name.ilike.%${escapeIlike(sanitizedAgency)}%`);
     }
+
     if (sanitizedAgencyCode) {
       const codeCandidates = agencySlugCandidates(sanitizedAgencyCode);
-      const codeClauses = new Set<string>();
       for (const code of codeCandidates.codeCandidates) {
-        if (!code) continue;
-        const sanitized = escapeIlike(code);
-        codeClauses.add(`agency_code.ilike.${sanitized}`);
-        codeClauses.add(`agency_code.ilike.%${sanitized}%`);
-      }
-      if (codeClauses.size > 0) {
-        const clauseArray = Array.from(codeClauses);
-        console.log("🏢 Matching agency code", { table, clauses: clauseArray });
-        q = q.or(clauseArray.join(","));
+        agencyClauses.push(`agency_code.ilike.%${escapeIlike(code)}%`);
       }
     }
+
     if (sanitizedAgencySlug) {
-      const slugClauses = new Set<string>();
       const slugCandidates = agencySlugCandidates(sanitizedAgencySlug);
       for (const code of slugCandidates.codeCandidates) {
-        slugClauses.add(`agency_code.ilike.${escapeIlike(code)}`);
+        agencyClauses.push(`agency_code.ilike.%${escapeIlike(code)}%`);
       }
       if (slugCandidates.nameFragment) {
-        const pattern = `%${escapeIlike(slugCandidates.nameFragment)}%`;
-        slugClauses.add(`agency_name.ilike.${pattern}`);
-        slugClauses.add(`agency.ilike.${pattern}`);
-      }
-
-      if (slugClauses.size > 0) {
-        const clauseArray = Array.from(slugClauses);
-        console.log("🏢 Matching agency slug", { table, clauses: clauseArray });
-        q = q.or(clauseArray.join(","));
+        const fragment = escapeIlike(slugCandidates.nameFragment);
+        agencyClauses.push(`agency_name.ilike.%${fragment}%`);
+        agencyClauses.push(`agency.ilike.%${fragment}%`);
       }
     }
+
+    if (agencyClauses.length > 0) {
+      console.log("🏢 Matching all agency conditions", agencyClauses);
+      q = q.or(agencyClauses.join(","), { foreignTable: undefined });
+    }
+
+    /** Has Apply Link */
     if (hasApplyLink) {
       console.log("📝 Filtering to grants with application links", { table });
       q = q.not("apply_link", "is", null);
     }
 
+    /** Jurisdiction filters */
     if (jurisdiction === "federal") {
       const orClauses = ["state.is.null"];
       for (const label of FEDERAL_STATE_LABELS) {
         const sanitizedLabel = escapeIlike(label);
         orClauses.push(`state.ilike.%${sanitizedLabel}%`);
       }
-      console.log("🏛️ Applying federal jurisdiction filter", {
-        table,
-        clauses: orClauses,
-      });
+      console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
       q = q.or(orClauses.join(","));
     } else if (jurisdiction === "state") {
       const cityClauses = ["city.is.null"];
@@ -179,10 +169,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         const sanitizedLabel = escapeIlike(label);
         cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
       }
-      console.log("🗺️ Applying state jurisdiction filter", {
-        table,
-        clauses: cityClauses,
-      });
+      console.log("🗺️ Applying state jurisdiction filter", { table, clauses: cityClauses });
       q = q.or(cityClauses.join(","));
     } else if (jurisdiction === "local") {
       console.log("🏘️ Applying local jurisdiction filter", { table });
@@ -192,6 +179,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       }
     }
 
+    /** Execute Query */
     const { data, error, count } = (await q) as unknown as {
       data: Grant[] | null;
       error: PostgrestError | null;
@@ -203,6 +191,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       break;
     }
 
+    /** Transform Results */
     const grants = (data ?? []).map((grant) => {
       const agencyName = grant.agency_name ?? grant.agency ?? null;
       const categoryLabel = grant.category ?? grant.category_code ?? null;
@@ -221,6 +210,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         category_code: grant.category_code ?? null,
       };
     });
+
     const total = count ?? grants.length;
     console.log("⬅️ Query result summary", {
       table,
@@ -229,6 +219,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       page,
       pageSize,
     });
+
     return {
       grants,
       total,
@@ -241,11 +232,12 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   return { grants: [], total: 0, page, pageSize, totalPages: 0 };
 }
 
+/** Helper utilities */
 const toComparable = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
-
 const textIncludes = (text: string | null | undefined, keyword: string) =>
   toComparable(text).includes(keyword);
 
+/** Local filtering (fallback) */
 export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolean {
   const keyword = toComparable(filters.query);
   if (keyword) {
@@ -259,8 +251,8 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   if (category && !textIncludes(grant.category, category)) return false;
 
   const location = inferGrantLocation(grant);
-
   const filterStateCode = normalizeStateCode(filters.stateCode ?? undefined);
+
   if (filterStateCode) {
     if (location.jurisdiction === "federal") return false;
     if (location.stateCode.toUpperCase() !== filterStateCode) return false;
@@ -269,10 +261,7 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   if (filters.jurisdiction && location.jurisdiction !== filters.jurisdiction) return false;
 
   const state = toComparable(filters.state);
-  if (state) {
-    const grantState = toComparable(grant.state);
-    if (!grantState || !grantState.includes(state)) return false;
-  }
+  if (state && !textIncludes(grant.state, state)) return false;
 
   const cityFilter = toComparable(filters.city);
   if (cityFilter && !textIncludes(grant.city, cityFilter)) return false;
@@ -285,6 +274,7 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   return true;
 }
 
+/** Local filtering + pagination */
 export function filterGrantsLocally(
   grants: Grant[],
   filters: GrantFilters = {},
@@ -299,6 +289,7 @@ export function filterGrantsLocally(
     const bKey = b.scraped_at ?? "";
     return aKey > bKey ? -1 : 1;
   });
+
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
   const paginated = sorted.slice(from, to);
@@ -312,21 +303,12 @@ export function filterGrantsLocally(
   };
 }
 
+/** Get a single grant by ID */
 export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
 
-  console.log("🧾 getGrantById starting lookup", {
-    id,
-    supabaseClientReady: Boolean(supabase),
-  });
-
   for (const table of TABLE_FALLBACK_ORDER) {
-    console.log("📄 Querying table for grant", {
-      table,
-      id,
-      timestamp: new Date().toISOString(),
-    });
     const { data, error } = (await supabase
       .from(table)
       .select("*")
@@ -340,26 +322,13 @@ export async function getGrantById(id: string): Promise<Grant | null> {
       console.error("❌ getGrantById error:", error);
       break;
     }
-    if (data) {
-      console.log("✅ getGrantById found grant", {
-        table,
-        id,
-        keys: Object.keys(data ?? {}),
-        titlePreview: data.title?.slice(0, 120) ?? null,
-      });
-      return data;
-    }
-    console.log("⚠️ getGrantById no result in table", {
-      table,
-      id,
-      dataType: data === null ? "null" : typeof data,
-    });
+    if (data) return data;
   }
 
-  console.log("🚫 getGrantById grant not found", { id });
   return null;
 }
 
+/** Get grant by short ID prefix */
 export async function getGrantByShortId(short: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
@@ -367,10 +336,6 @@ export async function getGrantByShortId(short: string): Promise<Grant | null> {
   const target = short.trim().toLowerCase();
   if (!target) return null;
 
-  // short === first UUID segment; match prefix with or without a hyphen.
-  // Some grant IDs are bare UUIDs ("<short>-...") while others are custom
-  // identifiers without a hyphen ("<short>"). We allow both by matching the
-  // lowercase prefix regardless of what character follows it.
   const { data, error } = await supabase
     .from("grants")
     .select("*")
@@ -386,6 +351,7 @@ export async function getGrantByShortId(short: string): Promise<Grant | null> {
   return data ?? null;
 }
 
+/** Faceted data for filters */
 export async function getFacetSets(): Promise<FacetSets> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return { categories: [], states: [], agencies: [] };

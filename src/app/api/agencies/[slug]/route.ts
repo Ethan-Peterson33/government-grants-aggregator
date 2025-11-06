@@ -10,12 +10,18 @@ export async function GET(
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number.parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(searchParams.get("pageSize") ?? "12", 10) || 12));
-  const { slug } = await context.params;
+  const { slug: slugValue } = await context.params;
+  const slug = typeof slugValue === "string" ? slugValue.trim() : "";
 
   const supabase = createServerSupabaseClient();
   if (!supabase) {
     console.error({ scope: "agency.api", message: "Supabase client unavailable", slug });
     return NextResponse.json({ error: "Supabase client unavailable" }, { status: 500 });
+  }
+
+  if (!slug) {
+    console.error({ scope: "agency.api", message: "Missing slug parameter", slugValue });
+    return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }
 
   const agency = await findAgencyBySlug(supabase, slug, { logScope: "agency.api" });

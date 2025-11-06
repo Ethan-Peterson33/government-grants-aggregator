@@ -17,7 +17,12 @@ async function resolveAgency(slug: string, scope: string) {
     console.error({ scope, message: "Supabase client unavailable while resolving agency", slug });
     return null;
   }
-  return findAgencyBySlug(supabase, slug, { logScope: scope });
+  const normalized = typeof slug === "string" ? slug.trim() : "";
+  if (!normalized) {
+    console.error({ scope, message: "Missing slug parameter for agency lookup", slug });
+    return null;
+  }
+  return findAgencyBySlug(supabase, normalized, { logScope: scope });
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {

@@ -140,14 +140,22 @@ async function findAgencyViaTable(
 
   const query = supabase
     .from(table)
-    .select(table === "agencies" ? "*" : "agency_code, agency_name, agency")
+    .select(table === "agencies" ? "*" : "agency_code, agency_name, agency, agency_id")
     .or(orClauses.join(","))
     .order(table === "agencies" ? "updated_at" : "scraped_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   const { data, error } = (await query) as unknown as {
-    data: AgencyRow | { agency_code?: string | null; agency_name?: string | null; agency?: string | null } | null;
+    data:
+      | AgencyRow
+      | {
+          agency_code?: string | null;
+          agency_name?: string | null;
+          agency?: string | null;
+          agency_id?: string | null;
+        }
+      | null;
     error: { message: string } | null;
   };
 
@@ -165,9 +173,14 @@ async function findAgencyViaTable(
     return data as AgencyRow;
   }
 
-  const grantRow = data as { agency_code?: string | null; agency_name?: string | null; agency?: string | null };
+  const grantRow = data as {
+    agency_code?: string | null;
+    agency_name?: string | null;
+    agency?: string | null;
+    agency_id?: string | null;
+  };
   return {
-    id: grantRow.agency_code ?? undefined,
+    id: grantRow.agency_id ?? grantRow.agency_code ?? undefined,
     agency_code: grantRow.agency_code ?? null,
     agency_name: grantRow.agency_name ?? grantRow.agency ?? null,
   } as AgencyRow;
@@ -193,6 +206,11 @@ async function findAgencyByName(
     `agency_name.ilike.${pattern}`,
     `agency.ilike.${pattern}`,
   ]);
+
+  log(scope, "info", "Attempting name-based agency lookup", {
+    slug,
+    patternCount: patterns.size,
+  });
 
   const fromAgencies = await findAgencyViaTable(supabase, "agencies", orClauses, scope, "name-match-agencies");
   if (fromAgencies) {
@@ -232,6 +250,10 @@ async function findAgencyByCode(
   }
 
   const clauseArray = Array.from(clauses);
+  log(scope, "info", "Attempting code-based agency lookup", {
+    slug,
+    clauseCount: clauseArray.length,
+  });
   const fromAgencies = await findAgencyViaTable(supabase, "agencies", clauseArray, scope, "code-match-agencies");
   if (fromAgencies) {
     log(scope, "info", "Matched agency via agencies table code", {
@@ -250,6 +272,57 @@ async function findAgencyByCode(
     return fromGrants;
   }
 
+  return null;
+}
+
+async function findAgencyByDerivedSlug(
+  supabase: SupabaseTableClient,
+  slug: string,
+  scope: string,
+): Promise<AgencyRow | null> {
+  log(scope, "info", "Attempting derived slug agency lookup", { slug });
+  const { data, error } = (await supabase
+    .from("agencies")
+    .select("*")
+    .limit(5000)) as unknown as {
+    data: AgencyRow[] | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    log(scope, "error", "Failed to fetch agencies while deriving slug", { error });
+    return null;
+  }
+
+  const rows = data ?? [];
+  for (const row of rows) {
+    const directCandidate = deriveAgencySlug({
+      slug: row.slug ?? undefined,
+      agency_code: row.agency_code ?? undefined,
+      agency_name: row.agency_name ?? row.name ?? undefined,
+    });
+    if (directCandidate && directCandidate === slug) {
+      log(scope, "info", "Derived slug matched agency row", {
+        slug,
+        agency_code: row.agency_code ?? null,
+      });
+      return row;
+    }
+
+    const nameCandidate = deriveAgencySlug({ slug: row.agency_name ?? undefined });
+    if (nameCandidate && nameCandidate === slug) {
+      log(scope, "info", "Derived slug matched agency name", {
+        slug,
+        agency_code: row.agency_code ?? null,
+      });
+      return row;
+    }
+  }
+
+  log(scope, "warn", "Derived slug lookup did not match any agencies", {
+    slug,
+    inspected: rows.length,
+  });
   return null;
 }
 
@@ -297,6 +370,18 @@ export async function findAgencyBySlug(
     }
   }
 
+  const byDerivedSlug = await findAgencyByDerivedSlug(supabase, normalizedSlug, scope);
+  if (byDerivedSlug) {
+    const normalized = toAgency(byDerivedSlug, normalizedSlug);
+    if (normalized) {
+      log(scope, "info", "Agency lookup succeeded via derived slug", {
+        slug: normalized.slug,
+        agency_code: normalized.agency_code,
+      });
+      return normalized;
+    }
+  }
+
   log(scope, "warn", "Agency lookup failed for slug", { slug: normalizedSlug });
   return null;
 }
@@ -305,17 +390,16 @@ function coalesceSlug(
   row: AgencyRow,
   fallbackSlug?: string
 ): string {
-  const fromRow = deriveAgencySlug({
-    slug: row.slug,
-    agency_code: row.agency_code,
-    agency_name: row.agency_name ?? row.name ?? undefined,
-  });
-  if (fromRow) return fromRow;
-
   if (fallbackSlug) {
     const fromFallback = deriveAgencySlug({ slug: fallbackSlug });
     if (fromFallback) return fromFallback;
   }
+
+  const fromName = deriveAgencySlug({
+    slug: row.slug,
+    agency_name: row.agency_name ?? row.name ?? undefined,
+  });
+  if (fromName) return fromName;
 
   if (row.agency_code) {
     const fromCode = deriveAgencySlug({ slug: row.agency_code });

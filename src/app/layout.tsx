@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ReactNode } from "react";
 import Link from "next/link";
+import { MainNavigation } from "@/components/main-navigation";
 
 const siteName = "GovGrants";
 const description =
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     "state grants",
     "federal grants",
   ],
-  metadataBase: new URL("https://example.com"),
+  metadataBase: new URL("https://www.grantdirectory.org"),
   openGraph: {
     title: siteName,
     description,
@@ -52,17 +53,7 @@ export default function RootLayout({
               </Link>
               <p className="text-sm text-slate-600">Government funding opportunities, in one place.</p>
             </div>
-            <nav className="hidden gap-6 text-sm font-medium text-slate-700 sm:flex">
-              <Link className="hover:text-slate-900" href="/grants">
-                Find Grants
-              </Link>
-              <Link className="hover:text-slate-900" href="/about">
-                About
-              </Link>
-              <Link className="hover:text-slate-900" href="/contact">
-                Contact
-              </Link>
-            </nav>
+            <MainNavigation />
           </div>
         </header>
         <main className="flex-1">{children}</main>

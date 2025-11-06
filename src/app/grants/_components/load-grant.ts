@@ -6,18 +6,30 @@ type SearchParamSource =
   | URLSearchParams
   | { get: (key: string) => string | null; getAll?: (key: string) => string[] | undefined };
 
-type SearchParamInput = SearchParamSource | Promise<SearchParamSource | undefined>;
+type SearchParamInput =
+  | SearchParamSource
+  | undefined
+  | Promise<SearchParamSource | undefined>
+  | Promise<SearchParamSource | Promise<SearchParamSource | undefined>>;
 
 function isPromise<T = unknown>(value: unknown): value is Promise<T> {
   return Boolean(value) && typeof (value as Promise<unknown>).then === "function";
 }
 
-function snapshotSearchParams(
-  source: SearchParamSource | undefined
-): Record<string, string | string[] | undefined> | string | null {
+type SearchParamSnapshot =
+  | Record<string, string | string[] | undefined>
+  | string
+  | null;
+
+function snapshotSearchParams(source: SearchParamSource | undefined): SearchParamSnapshot {
   if (!source) return null;
 
-  if (source instanceof URLSearchParams || typeof (source as URLSearchParams).entries === "function") {
+  if (isPromise(source)) {
+    return "[Promise]";
+  }
+
+  const entriesFn = (source as URLSearchParams).entries;
+  if (source instanceof URLSearchParams || typeof entriesFn === "function") {
     const entries = Array.from((source as URLSearchParams).entries());
     return entries.reduce<Record<string, string | string[] | undefined>>((acc, [key, value]) => {
       const existing = acc[key];
@@ -45,28 +57,76 @@ function snapshotSearchParams(
   return String(source);
 }
 
-async function normalizeSearchParams(
-  searchParams: SearchParamInput | undefined
-): Promise<{
+type NormalizedSearchParams = {
   params: SearchParamSource | undefined;
-  wasPromise: boolean;
+  promiseDepth: number;
   resolutionError: unknown;
-}> {
-  if (!searchParams) {
-    return { params: undefined, wasPromise: false, resolutionError: null };
+  snapshots: SearchParamSnapshot[];
+  lastResolvedType: string | null;
+};
+
+function summarizeSearchParamInput(input: SearchParamInput) {
+  const isInputPromise = isPromise(input);
+  const constructorName = input && typeof input === "object" ? input.constructor?.name ?? null : null;
+  const hasGet = Boolean(input && typeof (input as { get?: unknown }).get === "function");
+  const keys =
+    input && typeof input === "object" && !isInputPromise && !hasGet
+      ? Object.keys(input as Record<string, unknown>)
+      : null;
+
+  return {
+    isPromise: isInputPromise,
+    constructorName,
+    typeOf: typeof input,
+    hasGet,
+    keys,
+  };
+}
+
+async function normalizeSearchParams(searchParams: SearchParamInput): Promise<NormalizedSearchParams> {
+  const snapshots: SearchParamSnapshot[] = [];
+  let paramsOrPromise: SearchParamInput = searchParams;
+  let depth = 0;
+  let resolutionError: unknown = null;
+
+  while (paramsOrPromise && isPromise(paramsOrPromise)) {
+    depth += 1;
+    console.log("🧭 Resolving searchParams promise layer", { depth });
+    try {
+      paramsOrPromise = await paramsOrPromise;
+      console.log("🧭 Resolved searchParams layer", {
+        depth,
+        resolvedType:
+          paramsOrPromise && !isPromise(paramsOrPromise)
+            ? paramsOrPromise.constructor?.name ?? typeof paramsOrPromise
+            : paramsOrPromise && isPromise(paramsOrPromise)
+              ? "Promise"
+              : paramsOrPromise === undefined
+                ? "undefined"
+                : typeof paramsOrPromise,
+      });
+      snapshots.push(snapshotSearchParams(paramsOrPromise));
+    } catch (error) {
+      resolutionError = error;
+      console.error("🧭 Failed to resolve searchParams promise", { depth, error });
+      paramsOrPromise = undefined;
+      break;
+    }
   }
 
-  if (!isPromise(searchParams)) {
-    return { params: searchParams, wasPromise: false, resolutionError: null };
+  const params = (paramsOrPromise ?? undefined) as SearchParamSource | undefined;
+
+  if (paramsOrPromise && !isPromise(paramsOrPromise)) {
+    snapshots.push(snapshotSearchParams(params));
   }
 
-  try {
-    const resolved = await searchParams;
-    return { params: resolved ?? undefined, wasPromise: true, resolutionError: null };
-  } catch (error) {
-    console.error("🧭 Failed to resolve searchParams promise", error);
-    return { params: undefined, wasPromise: true, resolutionError: error };
-  }
+  const lastResolvedType = params
+    ? params.constructor?.name ?? typeof params
+    : resolutionError
+      ? "<error>"
+      : null;
+
+  return { params, promiseDepth: depth, resolutionError, snapshots, lastResolvedType };
 }
 
 function extractShortIdFromSlug(slug: string | undefined | null): string | null {
@@ -98,7 +158,15 @@ export async function loadGrant(
   slug: string | undefined,
   searchParams?: SearchParamInput
 ): Promise<Grant | null> {
-  const { params: resolvedParams, wasPromise, resolutionError } = await normalizeSearchParams(searchParams);
+  console.log("🧭 loadGrant invoked", {
+    slug,
+    rawSearchParams: searchParams ?? null,
+    rawSearchParamsSummary: summarizeSearchParamInput(searchParams),
+  });
+
+  const { params: resolvedParams, promiseDepth, resolutionError, snapshots, lastResolvedType } =
+    await normalizeSearchParams(searchParams);
+
   const idParam = resolveParam(resolvedParams, "id");
   const grantId = typeof idParam === "string" ? decodeURIComponent(idParam) : undefined;
   const short = extractShortIdFromSlug(slug);
@@ -108,10 +176,10 @@ export async function loadGrant(
     idParam,
     decodedGrantId: grantId,
     shortIdFromSlug: short,
-    searchParamsType: resolvedParams ? resolvedParams.constructor?.name ?? typeof resolvedParams : null,
-    searchParamsWasPromise: wasPromise,
+    searchParamsType: lastResolvedType,
+    searchParamsPromiseDepth: promiseDepth,
     searchParamsResolutionError: resolutionError ? String(resolutionError) : null,
-    searchParamsSnapshot: snapshotSearchParams(resolvedParams),
+    searchParamsSnapshots: snapshots,
   });
 
   if (grantId) {

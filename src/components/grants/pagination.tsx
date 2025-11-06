@@ -16,15 +16,24 @@ type PaginationLinkProps = PaginationBaseProps & {
   basePath: string;
   rawCategory?: string;
   onPageChange?: undefined;
+  getHref?: undefined;
 };
 
 type PaginationCallbackProps = PaginationBaseProps & {
   onPageChange: (page: number) => void;
   basePath?: undefined;
   rawCategory?: undefined;
+  getHref?: undefined;
 };
 
-type PaginationProps = PaginationLinkProps | PaginationCallbackProps;
+type PaginationHrefProps = PaginationBaseProps & {
+  getHref: (page: number) => string;
+  onPageChange?: undefined;
+  basePath?: undefined;
+  rawCategory?: undefined;
+};
+
+type PaginationProps = PaginationLinkProps | PaginationCallbackProps | PaginationHrefProps;
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -118,22 +127,23 @@ const Pagination: React.FC<PaginationProps> = (props) => {
     );
   }
 
-  const { basePath, rawCategory } = props;
-
-  const buildHref = (page: number) => {
-    const params = new URLSearchParams();
-    if (page > 1) {
-      params.set("page", String(page));
-    }
-    if (pageSize !== DEFAULT_PAGE_SIZE) {
-      params.set("pageSize", String(pageSize));
-    }
-    if (rawCategory) {
-      params.set("category", rawCategory);
-    }
-    const query = params.toString();
-    return query ? `${basePath}?${query}` : basePath;
-  };
+  const buildHref = "getHref" in props && typeof props.getHref === "function"
+    ? props.getHref
+    : (page: number) => {
+        const { basePath, rawCategory } = props as PaginationLinkProps;
+        const params = new URLSearchParams();
+        if (page > 1) {
+          params.set("page", String(page));
+        }
+        if (pageSize !== DEFAULT_PAGE_SIZE) {
+          params.set("pageSize", String(pageSize));
+        }
+        if (rawCategory) {
+          params.set("category", rawCategory);
+        }
+        const query = params.toString();
+        return query ? `${basePath}?${query}` : basePath;
+      };
 
   return (
     <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">

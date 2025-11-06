@@ -1,0 +1,55 @@
+// prisma/schema.prisma
+
+// Prisma schema for government grants aggregator
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Agency {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  agency_code String?  @unique
+  agency_name String
+  description String?  @db.Text
+  website     String?
+  contacts    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  grants Grant[]
+}
+
+model Grant {
+  id              String   @id
+  title           String
+  summary         String?
+  description     String?  @db.Text
+  category        String?
+  categoryCode    String?  @map("category_code")
+  fundingAmount   String?  @map("funding_amount")
+  eligibility     String?
+  deadline        String?
+  applyLink       String?  @map("apply_link")
+  openDate        String?  @map("open_date")
+  closeDate       String?  @map("close_date")
+  state           String?
+  city            String?
+  scrapedAt       DateTime? @map("scraped_at")
+  opportunityId   Int?     @map("opportunity_id")
+  opportunityNumber String? @map("opportunity_number")
+  agencyCode      String?  @map("agency_code")
+  agencyName      String?  @map("agency_name")
+  legacyAgency    String?  @map("agency")
+  agencyId        String?  @map("agency_id")
+  agency Agency? @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId])
+  @@index([categoryCode])
+  @@index([state])
+}

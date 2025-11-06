@@ -3,7 +3,11 @@ export type Grant = {
   title: string;
   apply_link: string | null;
   category: string | null;
+  category_code?: string | null;
   agency: string | null;
+  agency_name?: string | null;
+  agency_slug?: string | null;
+  agency_id?: string | null;
   funding_amount: string | null;
   eligibility: string | null;
   deadline: string | null;
@@ -11,7 +15,7 @@ export type Grant = {
   city: string | null;
   summary: string | null;
   description: string | null;
-  scraped_at: string;
+  scraped_at: string | null;
   opportunity_number?: string | null;
   opportunity_id?: number | null;
   agency_code?: string | null;

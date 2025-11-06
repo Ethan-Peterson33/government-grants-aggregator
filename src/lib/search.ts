@@ -8,6 +8,7 @@ import {
 } from "@/lib/grant-location";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
+import { slugify } from "@/lib/strings";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
@@ -162,7 +163,19 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       break;
     }
 
-    const grants = data ?? [];
+    const grants = (data ?? []).map((grant) => {
+      const agencyName = grant.agency_name ?? grant.agency ?? null;
+      const categoryLabel = grant.category ?? grant.category_code ?? null;
+      const fallbackSlug = agencyName ? slugify(agencyName) : "";
+      return {
+        ...grant,
+        agency: agencyName,
+        agency_name: agencyName,
+        agency_slug: grant.agency_slug ?? (fallbackSlug ? fallbackSlug : null),
+        category: categoryLabel,
+        category_code: grant.category_code ?? null,
+      };
+    });
     const total = count ?? grants.length;
     console.log("⬅️ Query result summary", {
       table,

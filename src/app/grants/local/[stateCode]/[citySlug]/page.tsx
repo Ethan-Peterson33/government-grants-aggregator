@@ -73,17 +73,6 @@ export default async function LocalGrantsPage({
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
-  const buildPageHref = (targetPage: number) => {
-    const queryParams = new URLSearchParams();
-    if (targetPage > 1) queryParams.set("page", String(targetPage));
-    if (pageSize !== PAGE_SIZE) queryParams.set("pageSize", String(pageSize));
-    if (rawCategory) queryParams.set("category", rawCategory);
-    const query = queryParams.toString();
-    return query
-      ? `/grants/local/${stateInfo.code}/${citySlug}?${query}`
-      : `/grants/local/${stateInfo.code}/${citySlug}`;
-  };
-
   const relatedLinks = [
     { label: `${stateInfo.name} statewide programs`, href: `/grants/state/${stateInfo.code}` },
     { label: "Federal grants", href: "/grants/federal" },
@@ -118,15 +107,15 @@ export default async function LocalGrantsPage({
             </div>
           )}
         </div>
-{hasResults && (
-  <Pagination
-    total={total}
-    pageSize={pageSize}
-    currentPage={page}
-    basePath={`/grants/local/${stateInfo.code}/${citySlug}`}
-    rawCategory={rawCategory}
-  />
-)}
+        {hasResults && (
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            basePath={`/grants/local/${stateInfo.code}/${citySlug}`}
+            rawCategory={rawCategory}
+          />
+        )}
       </section>
 
       <RelatedLinks links={relatedLinks} />

@@ -60,15 +60,6 @@ export default async function FederalGrantsPage({
   const itemListJsonLd = generateItemListJsonLd(grants);
   const hasResults = grants.length > 0;
 
-  const buildPageHref = (targetPage: number) => {
-    const params = new URLSearchParams();
-    if (targetPage > 1) params.set("page", String(targetPage));
-    if (pageSize !== PAGE_SIZE) params.set("pageSize", String(pageSize));
-    if (rawCategory) params.set("category", rawCategory);
-    const query = params.toString();
-    return query ? `/grants/federal?${query}` : `/grants/federal`;
-  };
-
   const relatedLinks = [
     !rawCategory
       ? { label: "Education programs", href: "/grants/federal?category=Education" }
@@ -103,11 +94,13 @@ export default async function FederalGrantsPage({
           )}
         </div>
         {hasResults && (
-          <Pagination   total={total}
-                        pageSize={pageSize}
-                        currentPage={page}
-                        basePath="/grants/federal"
-                        rawCategory={rawCategory} />
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            basePath="/grants/federal"
+            rawCategory={rawCategory}
+          />
         )}
       </section>
 

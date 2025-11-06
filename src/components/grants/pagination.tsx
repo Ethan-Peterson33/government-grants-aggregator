@@ -15,13 +15,13 @@ interface PaginationBaseProps {
 type PaginationLinkProps = PaginationBaseProps & {
   basePath: string;
   rawCategory?: string;
-  onPageChange?: never;
+  onPageChange?: undefined;
 };
 
 type PaginationCallbackProps = PaginationBaseProps & {
   onPageChange: (page: number) => void;
-  basePath?: never;
-  rawCategory?: never;
+  basePath?: undefined;
+  rawCategory?: undefined;
 };
 
 type PaginationProps = PaginationLinkProps | PaginationCallbackProps;
@@ -46,8 +46,8 @@ const Pagination: React.FC<PaginationProps> = (props) => {
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
-  if ("onPageChange" in props) {
-    const { onPageChange } = props;
+  if ("onPageChange" in props && typeof props.onPageChange === "function") {
+    const handlePageChange = props.onPageChange;
     return (
       <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
         {pageNumbers.map((pageNum) => {
@@ -56,7 +56,7 @@ const Pagination: React.FC<PaginationProps> = (props) => {
             <button
               key={pageNum}
               type="button"
-              onClick={() => onPageChange(pageNum)}
+              onClick={() => handlePageChange(pageNum)}
               disabled={isActive || isLoading}
               className={buttonClasses(isActive)}
             >

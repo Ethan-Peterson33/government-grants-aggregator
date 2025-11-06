@@ -48,6 +48,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const sanitizedState = like(filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
+  const sanitizedAgencySlug =
+    typeof filters.agencySlug === "string" && filters.agencySlug.trim().length > 0
+      ? filters.agencySlug.trim().toLowerCase()
+      : undefined;
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
@@ -60,6 +64,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     sanitizedState,
     sanitizedCity,
     sanitizedAgency,
+    sanitizedAgencySlug,
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
@@ -116,6 +121,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     if (sanitizedAgency) {
       console.log("🏢 Matching agency fragment", { table, agency: sanitizedAgency });
       q = q.ilike("agency", `%${sanitizedAgency}%`);
+    }
+    if (sanitizedAgencySlug) {
+      console.log("🏢 Matching agency slug", { table, agency_slug: sanitizedAgencySlug });
+      q = q.eq("agency_slug", sanitizedAgencySlug);
     }
     if (hasApplyLink) {
       console.log("📝 Filtering to grants with application links", { table });
@@ -249,7 +258,11 @@ export function filterGrantsLocally(
   const pageSize = filters.pageSize && filters.pageSize > 0 ? Math.min(filters.pageSize, 50) : defaultPageSize;
 
   const filtered = grants.filter((grant) => grantMatchesFilters(grant, filters));
-  const sorted = filtered.sort((a, b) => (a.scraped_at > b.scraped_at ? -1 : 1));
+  const sorted = filtered.sort((a, b) => {
+    const aKey = a.scraped_at ?? "";
+    const bKey = b.scraped_at ?? "";
+    return aKey > bKey ? -1 : 1;
+  });
   const from = (page - 1) * pageSize;
   const to = from + pageSize;
   const paginated = sorted.slice(from, to);

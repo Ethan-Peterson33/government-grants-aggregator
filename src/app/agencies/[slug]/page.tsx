@@ -1,51 +1,105 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import type { Prisma } from "@prisma/client";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
-import { prisma } from "@/lib/prisma";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { safeNumber } from "@/lib/search";
 import { slugify } from "@/lib/strings";
-import type { Grant } from "@/lib/types";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { Agency, Grant } from "@/lib/types";
 
-type PrismaGrantWithAgency = Prisma.GrantGetPayload<{ include: { agency: true } }>;
+type AgencyRow = {
+  id: string;
+  slug: string;
+  agency_name?: string | null;
+  name?: string | null;
+  agency_code?: string | null;
+  description?: string | null;
+  website?: string | null;
+  contacts?: unknown;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
 
-function serializeGrant(grant: PrismaGrantWithAgency) {
-  if (!grant) return null;
-  const agencyName = grant.agencyName ?? grant.legacyAgency ?? null;
-  const fallbackSlug = agencyName ? slugify(agencyName) : "";
-  const agencySlug = grant.agency?.slug ?? (fallbackSlug ? fallbackSlug : null);
+type GrantRow = Record<string, any>;
+
+function normalizeAgency(row: AgencyRow | null | undefined): Agency | null {
+  if (!row) return null;
+  const agencyName = row.agency_name ?? row.name ?? "";
+  if (!agencyName) return null;
   return {
-    id: grant.id,
-    title: grant.title,
-    apply_link: grant.applyLink ?? null,
-    category: grant.category ?? grant.categoryCode ?? null,
-    category_code: grant.categoryCode ?? null,
-    agency: agencyName,
+    id: row.id,
+    slug: row.slug,
     agency_name: agencyName,
-    agency_slug: agencySlug,
-    agency_code: grant.agencyCode ?? null,
-    funding_amount: grant.fundingAmount ?? null,
-    eligibility: grant.eligibility ?? null,
-    deadline: grant.deadline ?? null,
-    state: grant.state ?? null,
-    city: grant.city ?? null,
-    summary: grant.summary ?? null,
-    description: grant.description ?? null,
-    scraped_at: grant.scrapedAt ? grant.scrapedAt.toISOString() : null,
-    opportunity_number: grant.opportunityNumber ?? null,
-    opportunity_id: grant.opportunityId ?? null,
-    open_date: grant.openDate ?? null,
-    close_date: grant.closeDate ?? null,
-  } satisfies Grant;
+    agency_code: row.agency_code ?? null,
+    description: row.description ?? null,
+    website: row.website ?? null,
+    contacts: row.contacts ?? null,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+  } satisfies Agency;
 }
 
-async function loadAgency(slug: string) {
-  const agency = await prisma.agency.findUnique({ where: { slug } });
-  if (!agency) return null;
-  return agency;
+function normalizeGrant(row: GrantRow): Grant {
+  const agencyName = row.agency_name ?? row.agency ?? null;
+  const categoryLabel = row.category ?? row.category_code ?? null;
+  const fallbackSlug = agencyName ? slugify(agencyName) : "";
+  return {
+    ...row,
+    agency: agencyName,
+    agency_name: agencyName,
+    agency_slug: row.agency_slug ?? (fallbackSlug ? fallbackSlug : null),
+    category: categoryLabel,
+    category_code: row.category_code ?? null,
+  } as Grant;
+}
+
+async function loadAgency(slug: string): Promise<Agency | null> {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("agencies")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    console.error("❌ Failed to load agency", { slug, error });
+    return null;
+  }
+
+  return normalizeAgency(data as AgencyRow | null);
+}
+
+async function loadAgencyGrants(slug: string, page: number, pageSize: number) {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return { grants: [] as Grant[], total: 0 };
+  }
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = (await supabase
+    .from("grants")
+    .select("*", { count: "exact" })
+    .eq("agency_slug", slug)
+    .order("title", { ascending: true })
+    .range(from, to)) as unknown as {
+    data: GrantRow[] | null;
+    error: { message: string } | null;
+    count: number | null;
+  };
+
+  if (error) {
+    console.error("❌ Failed to load grants for agency", { slug, error });
+    return { grants: [] as Grant[], total: 0 };
+  }
+
+  const grants = (data ?? []).map((row) => normalizeGrant(row));
+  return { grants, total: count ?? grants.length };
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
@@ -74,18 +128,10 @@ export default async function AgencyPage({
     notFound();
   }
 
-  const [total, prismaGrants] = await Promise.all([
-    prisma.grant.count({ where: { agencyId: agency.id } }),
-    prisma.grant.findMany({
-      where: { agencyId: agency.id },
-      orderBy: { title: "asc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: { agency: true },
-    }),
-  ]);
-
-  const grants = prismaGrants.map((grant) => serializeGrant(grant) as Grant);
+  const { grants, total } = await loadAgencyGrants(agency.slug, page, pageSize);
+  const sortedGrants = [...grants].sort((a, b) =>
+    (a.title ?? "").localeCompare(b.title ?? "", undefined, { sensitivity: "base" })
+  );
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -93,7 +139,7 @@ export default async function AgencyPage({
     { label: agency.agency_name, href: `/agencies/${agency.slug}` },
   ];
 
-  const itemListJsonLd = generateItemListJsonLd(grants);
+  const itemListJsonLd = generateItemListJsonLd(sortedGrants);
 
   const getHref = (targetPage: number) => {
     const params = new URLSearchParams();
@@ -126,15 +172,15 @@ export default async function AgencyPage({
 
       <section className="space-y-4">
         <div className="space-y-4">
-          {grants.length ? (
-            grants.map((grant) => <GrantCard key={grant.id} grant={grant} />)
+          {sortedGrants.length ? (
+            sortedGrants.map((grant) => <GrantCard key={grant.id} grant={grant} />)
           ) : (
             <div className="rounded-md border border-slate-200 p-8 text-center text-slate-600">
               No grants published yet for this agency.
             </div>
           )}
         </div>
-        {grants.length > 0 && (
+        {sortedGrants.length > 0 && (
           <Pagination total={total} pageSize={pageSize} currentPage={page} getHref={getHref} />
         )}
       </section>

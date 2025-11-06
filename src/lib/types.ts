@@ -32,6 +32,7 @@ export type GrantFilters = {
   stateCode?: string;
   city?: string;
   agency?: string;
+  agencySlug?: string;
   hasApplyLink?: boolean;
   jurisdiction?: GrantJurisdiction;
   page?: number;
@@ -42,4 +43,16 @@ export type FacetSets = {
   categories: string[];
   states: string[];
   agencies: string[];
+};
+
+export type Agency = {
+  id: string;
+  slug: string;
+  agency_name: string;
+  agency_code: string | null;
+  description: string | null;
+  website: string | null;
+  contacts: unknown;
+  created_at: string | null;
+  updated_at: string | null;
 };

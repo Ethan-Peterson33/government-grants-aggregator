@@ -15,7 +15,7 @@ console.log('apiKey: ',apiKey,  '       fromAddress: ', fromAddress, '      toAd
 
   if (!apiKey || !fromAddress || !toAddress) {
     throw new Error("Contact email environment variables are missing.");
-  }
+  } 
 
   const response = await fetch(RESEND_API_ENDPOINT, {
     method: "POST",

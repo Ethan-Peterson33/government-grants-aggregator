@@ -165,15 +165,49 @@ export default async function GrantsIndexPage({
 
         <div className="w-full space-y-4 lg:w-72">
           <RelatedLinks links={relatedLinks.length ? relatedLinks : fallbackLinks} />
-          <section className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Need help?</h2>
-            <p className="mt-2">
-              Review eligibility requirements carefully and confirm deadlines on the official agency website before applying.
-            </p>
-            <Link href="https://www.grants.gov/" className="mt-3 inline-block text-blue-700 hover:text-blue-900">
-              Visit Grants.gov
-            </Link>
-          </section>
+            <section className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Helpful Links</h2>
+
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    href="/resources"
+                    className="text-blue-700 font-medium hover:text-blue-900 transition"
+                  >
+                    🧰 Explore Tools & Resources
+                  </Link>
+                  <p className="text-slate-500 text-xs mt-1">
+                    Grant writing templates, formation kits, and proposal tools.
+                  </p>
+                </li>
+
+                <li>
+                  <Link
+                    href="/contact"
+                    className="text-blue-700 font-medium hover:text-blue-900 transition"
+                  >
+                    📬 Contact Our Team
+                  </Link>
+                  <p className="text-slate-500 text-xs mt-1">
+                    Reach out for partnership or support inquiries.
+                  </p>
+                </li>
+
+                <li>
+                  <Link
+                    href="https://www.grants.gov/"
+                    target="_blank"
+                    className="text-blue-700 font-medium hover:text-blue-900 transition"
+                  >
+                    🏛 Visit Grants.gov
+                  </Link>
+                  <p className="text-slate-500 text-xs mt-1">
+                    Review eligibility requirements and official deadlines.
+                  </p>
+                </li>
+              </ul>
+            </section>
+
         </div>
       </div>
 

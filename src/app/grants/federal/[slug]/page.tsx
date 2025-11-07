@@ -5,6 +5,7 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
+import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 import {
   extractSearchParam,
   resolveRouteParams,
@@ -129,6 +130,7 @@ export default async function FederalGrantDetailPage({
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
       <GrantDetail grant={grant} />
+      <AffiliateOfferCard category={grant.category} agency={grant.agency} />
 
       {relatedGrants.length > 0 && (
         <section className="space-y-4">

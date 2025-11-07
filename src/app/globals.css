@@ -2,17 +2,32 @@
 
 @layer base {
   :root {
-    color-scheme: light;
+    --color-primary: #1e40af; /* Blue-800 */
+    --color-accent: #2563eb; /* Blue-600 */
+    --color-bg: #f9fafb; /* Gray-50 */
+    --color-border: #e5e7eb; /* Gray-200 */
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 min-h-screen;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-[var(--color-bg)] text-slate-900;
   }
 }
 
 @layer utilities {
   .container-grid {
     @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+}
+
+
+@layer components {
+  .grant-card {
+    @apply bg-white border border-[var(--color-border)] rounded-lg shadow-sm hover:shadow-md transition;
+  }
+  .grant-card-header {
+    @apply h-1 w-full rounded-t-lg;
+  }
+  .grant-card-body {
+    @apply p-6;
   }
 }

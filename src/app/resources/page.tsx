@@ -5,7 +5,7 @@ import Image from "next/image";
 
 const pageTitle = "Resources";
 const pageDescription =
-  "Curated tools, templates, and services that help grant professionals plan, write, and submit winning proposals.";
+  "Essential tools and services for finding, managing, and winning grants.";
 
 type Resource = {
   name: string;
@@ -19,45 +19,65 @@ type Resource = {
 
 const resources: Resource[] = [
   {
-    name: "Grant Writing Software Suite",
+    name: "Grant Writing Software",
     description:
-      "Collaborative workspace with AI-assisted drafting, compliance checklists, and deadline reminders for every application stage.",
-    benefit: "Cut drafting time in half with guided outlines and auto-filled boilerplate language.",
-    href: "https://partners.grantdirectory.org/grant-writing-suite",
+      "AI-assisted writing, compliance checks, and project tracking—all in one workspace.",
+    benefit: "Write stronger proposals faster with smart templates.",
+    href: "https://www.fiverr.com/search/gigs?query=grant%20writing&source=main_banner&ref_ctx_id=ef4d3e5028414c34824a98b264265a24&search_in=everywhere&search-autocomplete-original-term=grant%20writing", // example working link
     image:
       "https://images.unsplash.com/photo-1523285367489-d38aec03b7f3?auto=format&fit=crop&w=800&q=80",
-    cta: "Learn More",
+    cta: "Explore Tools",
     featured: true,
   },
   {
-    name: "Nonprofit Formation Accelerator",
+    name: "Nonprofit Formation Kit",
     description:
-      "Step-by-step incorporation toolkit including bylaws templates, EIN filing support, and compliance reminders.",
-    benefit: "Launch your nonprofit in weeks with attorney-reviewed templates and filing guidance.",
-    href: "https://partners.grantdirectory.org/nonprofit-formation-kit",
+      "Guided setup for nonprofit registration, EIN filing, and bylaws templates.",
+    benefit: "Start your nonprofit confidently and stay compliant.",
+    href: "https://www.incfile.com/nonprofit", // example working link
     image:
       "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=800&q=80",
-    cta: "Learn More",
+    cta: "Get Started",
   },
   {
-    name: "Grant Proposal Template Bundle",
+    name: "Proposal Templates",
     description:
-      "Editable proposal narratives, budget spreadsheets, and logic model frameworks crafted by veteran grant writers.",
-    benefit: "Deliver polished submissions faster with plug-and-play templates for every funding stream.",
-    href: "https://partners.grantdirectory.org/proposal-template-bundle",
+      "Ready-to-edit grant proposals, budgets, and logic models built by experts.",
+    benefit: "Save time and submit polished applications.",
+    href: "https://www.canva.com/templates/?category=proposals", // example working link
     image:
       "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=800&q=80",
-    cta: "Learn More",
+    cta: "Browse Templates",
   },
   {
-    name: "Grant Readiness Assessment",
+    name: "Grant Readiness Checklist",
     description:
-      "Interactive diagnostic that scores your organization across governance, finance, and impact storytelling.",
-    benefit: "Reveal strengths and blind spots before you apply so you can improve competitiveness.",
-    href: "https://partners.grantdirectory.org/grant-readiness-assessment",
+      "Quick self-assessment of your organization’s funding preparedness.",
+    benefit: "Identify your strengths before applying.",
+    href: "https://grantspace.org/resources/", // example working link
     image:
       "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=800&q=80",
-    cta: "Learn More",
+    cta: "Take Assessment",
+  },
+  {
+    name: "Small Business Formation",
+    description:
+      "Simple LLC setup and compliance management for entrepreneurs.",
+    benefit: "Protect your business and get funding-ready.",
+    href: "https://www.shopify.com/tools/business-name-generator", // example working link
+    image:
+      "https://images.unsplash.com/photo-1581093588401-22d8d8c68514?auto=format&fit=crop&w=800&q=80",
+    cta: "Launch Now",
+  },
+  {
+    name: "Accounting & Bookkeeping Tools",
+    description:
+      "Track grant budgets and expenses easily with modern accounting apps.",
+    benefit: "Stay organized and audit-ready year-round.",
+    href: "https://quickbooks.intuit.com/", // example working link
+    image:
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=800&q=80",
+    cta: "Try QuickBooks",
   },
 ];
 
@@ -146,18 +166,25 @@ export default function ResourcesPage() {
                   />
                 </div>
                 <div className="flex flex-1 flex-col justify-between space-y-4">
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-3">
-                      <h2 className="text-2xl font-semibold text-slate-900">{resource.name}</h2>
+                      <h2 className="text-xl font-semibold text-slate-900">
+                        {resource.name}
+                      </h2>
                       {resource.featured ? (
                         <span className="rounded-full bg-blue-600/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                          Featured Offer
+                          Featured
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm text-slate-600">{resource.description}</p>
+                    <p className="text-sm text-slate-600">
+                      {resource.description}
+                    </p>
                     <p className="text-sm font-medium text-slate-900">
-                      Main benefit: <span className="font-normal text-slate-700">{resource.benefit}</span>
+                      Benefit:{" "}
+                      <span className="font-normal text-slate-700">
+                        {resource.benefit}
+                      </span>
                     </p>
                   </div>
                   <div>

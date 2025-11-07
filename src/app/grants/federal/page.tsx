@@ -7,6 +7,7 @@ import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { safeNumber, searchGrants } from "@/lib/search";
 import type { Grant } from "@/lib/types";
 import { wordsFromSlug } from "@/lib/strings";
+import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 
 const PAGE_SIZE = 12;
 
@@ -86,7 +87,10 @@ export default async function FederalGrantsPage({
       <section className="space-y-4">
         <div className="space-y-4">
           {hasResults ? (
-            grants.map((grant: Grant) => <GrantCard key={grant.id} grant={grant} />)
+            <div key={grant.id}>
+                <GrantCard grant={grant} />
+                <AffiliateOfferCard category={grant.category} agency={grant.agency} />
+              </div>)
           ) : (
             <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
               <p>No federal grants found for this filter. Try another category or adjust your search keywords.</p>

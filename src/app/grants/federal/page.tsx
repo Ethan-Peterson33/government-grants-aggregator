@@ -90,10 +90,10 @@ export default async function FederalGrantsPage({
         <div key={grant.id}>
           <GrantCard grant={grant} />
           {/* Offer card placed under each grant detail card */}
-          <AffiliateOfferCard
-            category={grant.category}
-            agency={grant.agency}
-          />
+       <AffiliateOfferCard
+                        category={grant.category ?? undefined}
+                        agency={grant.agency ?? undefined}
+                      />
         </div>
       ))
     ) : (

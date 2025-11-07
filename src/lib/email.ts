@@ -11,6 +11,8 @@ export async function sendContactEmail({ name, email, message }: ContactEmailPay
   const fromAddress = process.env.CONTACT_EMAIL_FROM;
   const toAddress = process.env.CONTACT_EMAIL_TO;
 
+console.log('apiKey: ',apiKey,  '       fromAddress: ', fromAddress, '      toAddress: ', toAddress)
+
   if (!apiKey || !fromAddress || !toAddress) {
     throw new Error("Contact email environment variables are missing.");
   }

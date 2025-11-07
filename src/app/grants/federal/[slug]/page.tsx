@@ -130,7 +130,10 @@ export default async function FederalGrantDetailPage({
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
       <GrantDetail grant={grant} />
-      <AffiliateOfferCard category={grant.category} agency={grant.agency} />
+     <AffiliateOfferCard
+                        category={grant.category ?? undefined}
+                        agency={grant.agency ?? undefined}
+                      />
 
       {relatedGrants.length > 0 && (
         <section className="space-y-4">

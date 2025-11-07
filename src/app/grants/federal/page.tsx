@@ -83,30 +83,37 @@ export default async function FederalGrantsPage({
           and local opportunities for regional support.
         </p>
       </header>
-
-      <section className="space-y-4">
-        <div className="space-y-4">
-          {hasResults ? (
-            <div key={grant.id}>
-                <GrantCard grant={grant} />
-                <AffiliateOfferCard category={grant.category} agency={grant.agency} />
-              </div>)
-          ) : (
-            <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
-              <p>No federal grants found for this filter. Try another category or adjust your search keywords.</p>
-            </div>
-          )}
-        </div>
-        {hasResults && (
-          <Pagination
-            total={total}
-            pageSize={pageSize}
-            currentPage={page}
-            basePath="/grants/federal"
-            rawCategory={rawCategory}
+<section className="space-y-4">
+  <div className="space-y-4">
+    {hasResults ? (
+      grants.map((grant: Grant) => (
+        <div key={grant.id}>
+          <GrantCard grant={grant} />
+          {/* Offer card placed under each grant detail card */}
+          <AffiliateOfferCard
+            category={grant.category}
+            agency={grant.agency}
           />
-        )}
-      </section>
+        </div>
+      ))
+    ) : (
+      <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
+        <p>
+          No federal grants found for this filter. Try another category or adjust your search keywords.
+        </p>
+      </div>
+    )}
+  </div>
+  {hasResults && (
+    <Pagination
+      total={total}
+      pageSize={pageSize}
+      currentPage={page}
+      basePath="/grants/federal"
+      rawCategory={rawCategory}
+    />
+  )}
+</section>
 
       <RelatedLinks links={relatedLinks} />
 

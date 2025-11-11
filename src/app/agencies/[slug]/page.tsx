@@ -131,17 +131,24 @@ export default async function AgencyPage({
   const pageSize = Math.min(50, safeNumber(resolvedSearchParams?.pageSize, DEFAULT_PAGE_SIZE));
 
   const slugParam = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : "";
-  const agency = await resolveAgency(slugParam, "agency.page");
-  if (!agency) {
-    notFound();
-  }
+const agency = await resolveAgency(slugParam, "agency.page");
+
+    if (!agency) {
+      notFound();
+    }
+
+    
+    const displaySlug =
+      agency.slug ??
+      (agency.agency_code ? agency.agency_code.toLowerCase() : "") ??
+      "";
 
   const [initialResults, facets] = await Promise.all([
     searchGrants({
       page,
       pageSize,
       agency: agency.agency_name,
-      agencySlug: agency.slug,
+      agencySlug: agency.slug ?? undefined,
       agencyCode: agency.agency_code ?? undefined,
     }),
     getFacetSets(),
@@ -194,26 +201,27 @@ export default async function AgencyPage({
       </header>
 
       <section className="space-y-6">
-        <GrantsSearchClient
-          initialFilters={{
-            query: "",
-            category: "",
-            state: "",
-            agency: agency.agency_name,
-            hasApplyLink: false,
-            page,
-            pageSize,
-          }}
-          initialResults={initialResults}
-          categories={categoryOptions}
-          states={stateOptions}
-          agencies={agencyOptions}
-          lockedAgency={{
-            label: agency.agency_name,
-            slug: agency.slug,
-            code: agency.agency_code ?? undefined,
-          }}
-        />
+                        <GrantsSearchClient
+                    initialFilters={{
+                      query: "",
+                      category: "",
+                      state: "",
+                      agency: agency.agency_name,
+                      hasApplyLink: false,
+                      page,
+                      pageSize,
+                    }}
+                    initialResults={initialResults}
+                    categories={categoryOptions}
+                    states={stateOptions}
+                    agencies={agencyOptions}
+                    lockedAgency={{
+                      label: agency.agency_name,
+                      slug: displaySlug,                 // ✅ now always a string
+                      code: agency.agency_code ?? undefined,
+                    }}
+                  />
+
       </section>
 
       <script

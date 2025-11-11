@@ -48,7 +48,7 @@ export type FacetSets = {
 
 export type Agency = {
   id: string;
-  slug: string;
+  slug: string | null; 
   agency_name: string;
   agency_code: string | null;
   description: string | null;

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
-<url><loc>https://www.grantdirectory.org/about</loc><lastmod>2025-11-11T16:31:47.102Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://www.grantdirectory.org/contact</loc><lastmod>2025-11-11T16:31:47.102Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://www.grantdirectory.org/grants/federal</loc><lastmod>2025-11-11T16:31:47.102Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://www.grantdirectory.org</loc><lastmod>2025-11-11T16:31:47.102Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://www.grantdirectory.org/resources</loc><lastmod>2025-11-11T16:31:47.102Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org/about</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org/agencies</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org/contact</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org/grants/federal</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://www.grantdirectory.org/resources</loc><lastmod>2025-11-11T19:24:52.551Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
 <url><loc>https://www.grantdirectory.org/grants/federal/geospatial-intelligence-processing-and-exploitation-geopex-b8ae9377?id=b8ae9377-e80a-43eb-8919-a7f00f3e9593</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
 <url><loc>https://www.grantdirectory.org/grants/federal/defense-production-act-title-iii-expansion-of-domestic-production-capability-and-capacity-cfc6dc67?id=cfc6dc67-6cb6-43bd-aef5-c488409b5ab9</loc><changefreq>daily</changefreq><priority>0.6</priority></url>
 <url><loc>https://www.grantdirectory.org/grants/federal/research-and-development-rad-directed-energy-rd-university-assistance-instruments-0ddf46ae?id=0ddf46ae-0602-4857-a963-71cdf02f9b04</loc><changefreq>daily</changefreq><priority>0.6</priority></url>

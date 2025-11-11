@@ -101,11 +101,10 @@ export function agencyGrantFilterClauses(agency: Agency) {
     nameFragments.add(agency.agency_name.trim().toLowerCase());
   }
 
-  const slugCandidates = agencySlugCandidates(agency.slug);
+  const slugCandidates = agencySlugCandidates(agency.slug ?? "");
   if (slugCandidates.nameFragment) {
     nameFragments.add(slugCandidates.nameFragment);
   }
-
   if (agency.agency_code) {
     const fromCode = agencySlugCandidates(agency.agency_code).nameFragment;
     if (fromCode) {

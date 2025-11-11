@@ -145,94 +145,218 @@ export default async function GrantsIndexPage({
   ];
 
   return (
-    <div className="container-grid space-y-6 py-10">
-      <Breadcrumb items={breadcrumbItems} />
-      <div className="flex flex-col gap-10 lg:flex-row">
-        <div className="flex-1 space-y-6">
-          <section className="space-y-4">
-            <header className="space-y-2">
-              <h1 className="text-3xl font-semibold text-slate-900">Government grants</h1>
-              <p className="text-slate-600">
-                Discover grants across agencies, categories, and regions. Filter results to find funding that matches your
-                mission.
-              </p>
-            </header>
-            <GrantsSearchClient
-              initialFilters={{
-                query: query ?? "",
-                category: category ?? "",
-                state: state ?? "",
-                agency: agency ?? "",
-                hasApplyLink,
-                page,
-                pageSize,
-              }}
-              initialResults={{ grants, total, page, pageSize, totalPages }}
-              categories={categoryOptions}
-              states={stateOptions}
-              agencies={agencyOptions}
-            />
-          </section>
-        </div>
+  <div className="container-grid space-y-8 py-10">
+    <Breadcrumb items={breadcrumbItems} />
 
-        <div className="w-full space-y-4 lg:w-72">
-          <RelatedLinks links={relatedLinks.length ? relatedLinks : fallbackLinks} />
-            <section className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">Helpful Links</h2>
+    <section className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] items-start">
+      {/* MAIN COLUMN */}
+      <div className="space-y-8">
+        {/* HERO / INTRO */}
+        <header className="space-y-4 rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            Find public funding faster
+          </p>
+          <div className="space-y-3">
+            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
+              Search government grants in one place
+            </h1>
+            <p className="text-slate-600 text-sm sm:text-base">
+              Browse federal opportunities and growing coverage of state and local programs.
+              Filter by keyword, agency, or eligibility to find grants that match your nonprofit,
+              small business, or community project.
+            </p>
+          </div>
 
-              <ul className="space-y-2">
+          {/* QUICK INTERNAL LINKS / CHIPS */}
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            <Link
+              href="/grants/federal"
+              className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-medium text-blue-800 hover:bg-blue-100"
+            >
+              Federal grants overview
+            </Link>
+
+          
+
+        {/*
+            {stateOptions[0] && (
+              <Link
+                href={`/grants?state=${encodeURIComponent(stateOptions[0].value)}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+              >
+                Funding in {stateOptions[0].label}
+              </Link>
+            )}
+
+          {categoryOptions[0] && (
+              <Link
+                href={`/grants?category=${encodeURIComponent(categoryOptions[0].value)}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+              >
+                {categoryOptions[0].label} programs
+              </Link>
+              
+                <Link
+              href="/grants?has_apply_link=1"
+              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+            >
+              Grants with apply links
+            </Link>
+              
+              
+              } 
+            )
+            */  
+            }
+          </div>
+        </header>
+
+        {/* SEARCH + RESULTS */}
+        <section className="space-y-6">
+          <GrantsSearchClient
+            initialFilters={{
+              query: query ?? "",
+              category: category ?? "",
+              state: state ?? "",
+              agency: agency ?? "",
+              hasApplyLink,
+              page,
+              pageSize,
+            }}
+            initialResults={{ grants, total, page, pageSize, totalPages }}
+            categories={categoryOptions}
+            states={stateOptions}
+            agencies={agencyOptions}
+          />
+
+          {/* BROWSE POPULAR SECTIONS (INTERNAL LINK HUB) */}
+          <section
+            aria-label="Popular ways to browse grants"
+            className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-3"
+          >
+            <div className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                By level of government
+              </h2>
+              <ul className="space-y-1 text-sm">
                 <li>
-                  <Link
-                    href="/resources"
-                    className="text-blue-700 font-medium hover:text-blue-900 transition"
-                  >
-                    🧰 Explore Tools & Resources
+                  <Link href="/grants/federal" className="text-blue-700 hover:text-blue-900">
+                    Federal grants (nationwide)
                   </Link>
-                  <p className="text-slate-500 text-xs mt-1">
-                    Grant writing templates, formation kits, and proposal tools.
-                  </p>
                 </li>
+ 
+              </ul>
+            </div>
 
-                <li>
-                  <Link
-                    href="/contact"
-                    className="text-blue-700 font-medium hover:text-blue-900 transition"
-                  >
-                    📬 Contact Our Team
-                  </Link>
-                  <p className="text-slate-500 text-xs mt-1">
-                    Reach out for partnership or support inquiries.
-                  </p>
-                </li>
-
-                <li>
-                  <Link
-                    href="https://www.grants.gov/"
-                    target="_blank"
-                    className="text-blue-700 font-medium hover:text-blue-900 transition"
-                  >
-                    🏛 Visit Grants.gov
-                  </Link>
-                  <p className="text-slate-500 text-xs mt-1">
-                    Review eligibility requirements and official deadlines.
-                  </p>
+            <div className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                By location
+              </h2>
+              <ul className="space-y-1 text-sm">
+                {stateOptions.slice(0, 2).map((opt) => (
+                  <li key={opt.value}>
+                    <Link
+                      href={`/grants?state=${encodeURIComponent(opt.value)}`}
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      Funding in {opt.label}
+                    </Link>
+                  </li>
+                ))}
+                <li className="text-slate-500 text-xs">
+                  More states will appear here as coverage expands.
                 </li>
               </ul>
-            </section>
+            </div>
 
-        </div>
+            <div className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                By program type
+              </h2>
+              <ul className="space-y-1 text-sm">
+                {categoryOptions.slice(0, 2).map((opt) => (
+                  <li key={opt.value}>
+                    <Link
+                      href={`/grants?category=${encodeURIComponent(opt.value)}`}
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      {opt.label} grants
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link href="/resources" className="text-blue-700 hover:text-blue-900">
+                    Tools for grant writing & planning
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </section>
+        </section>
       </div>
 
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
-            itemListJsonLd,
-          ]),
-        }}
-      />
-    </div>
-  );
+      {/* RIGHT SIDEBAR */}
+      <div className="w-full space-y-4 lg:w-72">
+        <RelatedLinks links={relatedLinks.length ? relatedLinks : fallbackLinks} />
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">
+            Helpful links
+          </h2>
+
+          <ul className="space-y-2">
+            <li>
+              <Link
+                href="/resources"
+                className="text-blue-700 font-medium hover:text-blue-900 transition"
+              >
+                🧰 Explore tools & resources
+              </Link>
+              <p className="text-slate-500 text-xs mt-1">
+                Grant writing templates, formation kits, and proposal tools.
+              </p>
+            </li>
+
+            <li>
+              <Link
+                href="/contact"
+                className="text-blue-700 font-medium hover:text-blue-900 transition"
+              >
+                📬 Contact our team
+              </Link>
+              <p className="text-slate-500 text-xs mt-1">
+                Reach out for partnership, corrections, or support inquiries.
+              </p>
+            </li>
+
+            <li>
+              <Link
+                href="https://www.grants.gov/"
+                target="_blank"
+                className="text-blue-700 font-medium hover:text-blue-900 transition"
+              >
+                🏛 Visit Grants.gov
+              </Link>
+              <p className="text-slate-500 text-xs mt-1">
+                Confirm official eligibility, deadlines, and application instructions.
+              </p>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <script
+      type="application/ld+json"
+      suppressHydrationWarning
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify([
+          generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+          itemListJsonLd,
+        ]),
+      }}
+    />
+  </div>
+);
+
 }

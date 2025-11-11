@@ -18,15 +18,15 @@ type Props = {
 
 // Example affiliate offers (you can expand this easily)
 const offers: AffiliateOffer[] = [
-  {
-    title: "Grant Writing Software Suite",
-    description:
-      "Accelerate your next submission with AI-assisted grant writing, compliance tools, and collaboration features.",
-    href: "https://partners.grantdirectory.org/grant-writing-suite",
-    cta: "Try It Free",
-    tag: "Top Pick",
-    color: "blue",
-  },
+{
+  title: "Grant Writing Services on Fiverr",
+  description:
+    "Struggling with grant applications? Get expert help from professional freelance writers on Fiverr — from research and proposal drafts to compliance review and submission. Secure funding faster with proven talent.",
+  href: "https://www.fiverr.com/search/gigs?query=grant%20writing&source=main_banner",
+  cta: "Get started now",
+  tag: "Top Pick",
+  color: "blue",
+}/*,
   {
     title: "Nonprofit Formation Accelerator",
     description:
@@ -41,8 +41,8 @@ const offers: AffiliateOffer[] = [
       "Access tailored templates and funding search tools designed for small business owners and startups.",
     href: "https://partners.grantdirectory.org/small-business-toolkit",
     cta: "Explore Toolkit",
-    color: "amber",
-  },
+    color: "amber",*/
+  
 ];
 
 // Choose the best affiliate offer based on the category/agency

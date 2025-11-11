@@ -34,12 +34,24 @@ export async function generateMetadata({
   if (agency) segments.unshift(`${agency} programs`);
   if (query) segments.unshift(`Results for "${query}"`);
 
+  const canonical = "https://www.grantdirectory.org/grants";
+
   return {
     title: segments.join(" | "),
     description:
       "Explore the latest government funding opportunities with powerful filters for category, agency, state, and keyword.",
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      url: canonical,
+      title: segments.join(" | "),
+      description:
+        "Explore the latest government funding opportunities with powerful filters for category, agency, state, and keyword.",
+    },
   };
 }
+
 
 export default async function GrantsIndexPage({
   searchParams: rawSearchParams,

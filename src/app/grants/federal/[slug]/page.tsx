@@ -24,37 +24,39 @@ type FederalParams = { slug: string };
 type FederalSearchParams = SearchParamsLike;
 
 export async function generateMetadata({
-  params,
   searchParams,
 }: {
-  params: MaybePromise<FederalParams>;
-  searchParams?: MaybePromise<FederalSearchParams>;
+  searchParams?: Record<string, string | string[] | undefined>;
 }): Promise<Metadata> {
-  const resolvedParams = await resolveRouteParams(params, "federal.generateMetadata.params");
-  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
+  const category = formatCategory(rawCategory);
 
-  const grant = await loadGrant(slug, searchParams);
+  const baseTitle = category ? `${category} Federal Grants` : "Federal Government Grants";
+  const baseDescription = category
+    ? `Browse federal ${category.toLowerCase()} funding opportunities available nationwide.`
+    : "Explore national funding opportunities from federal agencies across the United States.";
 
-  if (!grant) {
-    return {
-      title: "Grant Not Found",
-      description: "The requested grant could not be located. Browse other federal opportunities.",
-    };
-  }
-
-  const canonical = grantPath(grant);
+  const baseUrl = "https://www.grantdirectory.org";
+  const canonical =
+    rawCategory && rawCategory.trim().length > 0
+      ? `${baseUrl}/grants/federal?category=${encodeURIComponent(rawCategory)}`
+      : `${baseUrl}/grants/federal`;
 
   return {
-    title: `${grant.title} | Federal grant`,
-    description: grant.summary ?? undefined,
-    alternates: { canonical },
+    title: baseTitle,
+    description: baseDescription,
+    alternates: {
+      canonical,
+    },
     openGraph: {
-      title: grant.title,
-      description: grant.summary ?? undefined,
-      type: "article",
+      url: canonical,
+      title: baseTitle,
+      description: baseDescription,
+      type: "website",
     },
   };
 }
+
 
 export default async function FederalGrantDetailPage({
   params,

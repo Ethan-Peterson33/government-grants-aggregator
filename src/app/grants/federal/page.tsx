@@ -29,11 +29,27 @@ export async function generateMetadata({
     ? `Browse federal ${category.toLowerCase()} funding opportunities available nationwide.`
     : "Explore national funding opportunities from federal agencies across the United States.";
 
+  const baseUrl = "https://www.grantdirectory.org";
+  const canonical =
+    rawCategory && rawCategory.trim().length > 0
+      ? `${baseUrl}/grants/federal?category=${encodeURIComponent(rawCategory)}`
+      : `${baseUrl}/grants/federal`;
+
   return {
     title: baseTitle,
     description: baseDescription,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      url: canonical,
+      title: baseTitle,
+      description: baseDescription,
+      type: "website",
+    },
   };
 }
+
 
 export default async function FederalGrantsPage({
   searchParams,

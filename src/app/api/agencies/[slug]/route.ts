@@ -36,7 +36,7 @@ export async function GET(
     page,
     pageSize,
     agency: agency.agency_name,
-    agencySlug: agency.slug,
+    agencySlug: agency.slug ?? undefined,
     agencyCode: agency.agency_code ?? undefined,
   });
 

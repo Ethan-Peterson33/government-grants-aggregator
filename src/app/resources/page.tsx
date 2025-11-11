@@ -26,8 +26,7 @@ const resources: Resource[] = [
     benefit: "Secure funding faster with proven talent.",
     href:
       "https://www.fiverr.com/search/gigs?query=grant%20writing&source=main_banner",
-    image:
-      "https://images.unsplash.com/photo-1523285367489-d38aec03b7f3?auto=format&fit=crop&w=800&q=80",
+    image: "/images/fiverr image.png",
     cta: "Get started now",
     featured: true,
   },
@@ -163,16 +162,18 @@ export default function ResourcesPage() {
                   : "mb-8 flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row"
               }
             >
-              <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-slate-100 md:h-44 md:w-56">
-                <Image
-                  src={resource.image}
-                  alt={resource.name}
-                  fill
-                  sizes="(max-width: 768px) 100vw, 220px"
-                  priority={resource.featured}
-                  className="object-cover"
-                />
-              </div>
+<div className="w-full rounded-xl bg-slate-100 overflow-hidden aspect-square">
+  <Image
+    src={resource.image}
+    alt={resource.name}
+    width={220}
+    height={120}
+    priority={resource.featured}
+    className="object-cover w-full h-full"
+  />
+</div>
+
+
               <div className="flex flex-1 flex-col justify-between space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">

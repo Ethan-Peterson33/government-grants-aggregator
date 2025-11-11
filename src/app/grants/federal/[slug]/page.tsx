@@ -17,11 +17,17 @@ import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
 import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
+import { wordsFromSlug } from "@/lib/strings";
 import { inferGrantLocation } from "@/lib/grant-location";
 
 type FederalParams = { slug: string };
 
 type FederalSearchParams = SearchParamsLike;
+
+function formatCategory(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return wordsFromSlug(value.toLowerCase().replace(/\s+/g, "-"));
+}
 
 export async function generateMetadata({
   searchParams,

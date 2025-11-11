@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://www.grantdirectory.org
+
+# Sitemaps
+Sitemap: https://www.grantdirectory.org/sitemap.xml

@@ -181,7 +181,7 @@ export function FiltersBar({
           id="search"
           value={filterState.query}
           onChange={handleQueryChange}
-          placeholder="Search grant titles, summaries, or descriptions"
+          placeholder="Search for grants"
           disabled={isLoading}
         />
       </div>

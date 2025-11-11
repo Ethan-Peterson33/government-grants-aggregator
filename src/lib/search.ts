@@ -44,6 +44,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
   const sanitizedQuery = like(filters.query);
   const sanitizedCategory = like(filters.category);
+
+  // 🔹 Raw state string from filters (for “Federal (nationwide)” detection)
+  const rawStateFilter = typeof filters.state === "string" ? filters.state.trim() : "";
+
   const sanitizedState = like(filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
@@ -58,7 +62,19 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
-  const jurisdiction = filters.jurisdiction ?? undefined;
+
+  // Detect when user chose the special “Federal” option in the UI
+  const stateLower = rawStateFilter.toLowerCase();
+  const isFederalStateFilter =
+    stateLower === "federal" ||
+    stateLower === "federal (nationwide)" ||
+    stateLower === "nationwide";
+
+  // If jurisdiction wasn't explicitly passed, derive it from the state filter
+  let jurisdiction = filters.jurisdiction ?? undefined;
+  if (!jurisdiction && isFederalStateFilter) {
+    jurisdiction = "federal";
+  }
 
   console.log("➡️ Final grant query filters", {
     sanitizedQuery,
@@ -105,7 +121,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         : [`state.ilike.%${escapeIlike(stateCode)}%`];
       console.log("🌎 Matching state code candidates", { table, stateCode, clauses });
       q = q.or(clauses.join(","));
-    } else if (sanitizedState) {
+    } else if (sanitizedState && !isFederalStateFilter) {
+      // Only apply a raw state fragment filter if the user isn't explicitly choosing "Federal"
       console.log("🌎 Matching state fragment", { table, state: sanitizedState });
       q = q.ilike("state", `%${sanitizedState}%`);
     }
@@ -155,29 +172,40 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     }
 
     /** Jurisdiction filters */
-    if (jurisdiction === "federal") {
-      const orClauses = ["state.is.null"];
-      for (const label of FEDERAL_STATE_LABELS) {
-        const sanitizedLabel = escapeIlike(label);
-        orClauses.push(`state.ilike.%${sanitizedLabel}%`);
-      }
-      console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
-      q = q.or(orClauses.join(","));
-    } else if (jurisdiction === "state") {
-      const cityClauses = ["city.is.null"];
-      for (const label of STATEWIDE_CITY_LABELS) {
-        const sanitizedLabel = escapeIlike(label);
-        cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
-      }
-      console.log("🗺️ Applying state jurisdiction filter", { table, clauses: cityClauses });
-      q = q.or(cityClauses.join(","));
-    } else if (jurisdiction === "local") {
-      console.log("🏘️ Applying local jurisdiction filter", { table });
-      q = q.not("city", "is", null).not("city", "eq", "");
-      for (const label of STATEWIDE_CITY_LABELS) {
-        q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
-      }
-    }
+if (jurisdiction === "federal") {
+  // Treat NULL *and* empty string as "federal / nationwide"
+  const orClauses = ["state.is.null", "state.eq."];
+
+  for (const label of FEDERAL_STATE_LABELS) {
+    const sanitizedLabel = escapeIlike(label);
+    orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+  }
+
+  console.log("🏛️ Applying federal jurisdiction filter", {
+    table,
+    clauses: orClauses,
+  });
+
+  q = q.or(orClauses.join(","));
+} else if (jurisdiction === "state") {
+  const cityClauses = ["city.is.null"];
+  for (const label of STATEWIDE_CITY_LABELS) {
+    const sanitizedLabel = escapeIlike(label);
+    cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
+  }
+  console.log("🗺️ Applying state jurisdiction filter", {
+    table,
+    clauses: cityClauses,
+  });
+  q = q.or(cityClauses.join(","));
+} else if (jurisdiction === "local") {
+  console.log("🏘️ Applying local jurisdiction filter", { table });
+  q = q.not("city", "is", null).not("city", "eq", "");
+  for (const label of STATEWIDE_CITY_LABELS) {
+    q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
+  }
+}
+
 
     /** Execute Query */
     const { data, error, count } = (await q) as unknown as {
@@ -373,9 +401,25 @@ export async function getFacetSets(): Promise<FacetSets> {
     }
 
     f.categories = clean(cat.data.map((x: any) => x.category)).slice(0, 50);
-    f.states = clean(st.data.map((x: any) => x.state)).slice(0, 60);
+
+    const dbStates = clean(st.data.map((x: any) => x.state)).slice(0, 60);
+
+    // Always provide at least a Federal option for now
+    const hasFederalAlready = dbStates.some((s) =>
+      s.toLowerCase().includes("federal") || s.toLowerCase().includes("nationwide")
+    );
+
+    f.states = hasFederalAlready
+      ? dbStates
+      : ["Federal (nationwide)", ...dbStates];
+
     f.agencies = clean(ag.data.map((x: any) => x.agency)).slice(0, 50);
     break;
+  }
+
+  // Fallback if DB returns nothing at all
+  if (f.states.length === 0) {
+    f.states = ["Federal (nationwide)"];
   }
 
   return f;

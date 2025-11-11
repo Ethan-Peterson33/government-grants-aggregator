@@ -65,17 +65,48 @@ export async function generateMetadata({
 }: {
   params?: MaybePromise<RouteParams>;
 }): Promise<Metadata> {
-  console.log({ scope: "agency.metadata", message: "generateMetadata invoked", params });
   const resolvedParams = await resolveMaybePromise(params, "agency.metadata");
-  console.log({ scope: "agency.metadata", message: "generateMetadata resolved params", resolvedParams });
   const slugParam = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : "";
+
   const agency = await resolveAgency(slugParam, "agency.metadata");
+
   if (!agency) {
-    return { title: "Agency Not Found" };
+    return {
+      title: "Agency Not Found",
+      description: "The requested funding agency could not be located. Browse other government funders.",
+      // Optionally: point back to /agencies
+      alternates: {
+        canonical: "/agencies",
+      },
+    };
   }
+
+  const agencyName = agency.agency_name ?? "Government Agency";
+  const description =
+    agency.description ??
+    `Explore current and past grant opportunities, funding programs, and announcements from ${agencyName}.`;
+
+  const canonicalPath = `/agencies/${encodeURIComponent(slugParam)}`;
+
   return {
-    title: `${agency.agency_name} Grants`,
-    description: agency.description ?? `Explore grants from ${agency.agency_name}.`,
+    title: `${agencyName} Grants & Funding Opportunities`,
+    description,
+    alternates: {
+      // This tells Google “THIS is the main URL for this content”
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title: `${agencyName} Grants & Funding Opportunities`,
+      description,
+      type: "website",
+      // optional but nice:
+      url: canonicalPath,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${agencyName} Grants`,
+      description,
+    },
   };
 }
 

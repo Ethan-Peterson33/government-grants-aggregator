@@ -48,10 +48,10 @@ export default async function LocalGrantsPage({
   const resolvedParams = await params;
   const { stateCode, citySlug: citySlugParam, slug } = resolvedParams;
 
-  // ✅ SAFETY GUARD
-  if (stateCode?.toLowerCase() === "category") {
-    redirect(`/grants/category/${citySlugParam}`);
+  if (resolvedParams.stateCode?.toLowerCase() === "category") {
+    redirect(`/grants/category/${resolvedParams.citySlug}`);
   }
+
 
   const stateInfo = resolveStateParam(stateCode ?? "");
   const citySlug = citySlugParam ?? "";

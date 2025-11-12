@@ -27,53 +27,44 @@ export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: MaybePromise<LocalParams>;
-  searchParams?: MaybePromise<LocalSearchParams>;
+  params: Promise<{ stateCode: string; citySlug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const resolvedParams = await resolveRouteParams(params, "local.generateMetadata.params");
-  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
-  const citySlug = typeof resolvedParams?.citySlug === "string" ? resolvedParams.citySlug : "";
-  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+  // ✅ Unwrap async params
+  const resolvedParams = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
 
-  const stateInfo = resolveStateParam(stateCode);
-  const cityName = cityNameFromSlug(citySlug);
-
-  const grant = await loadGrant(slug, searchParams);
-
-  if (!grant) {
-    return {
-      title: "Grant Not Found",
-      description: `We couldn't find that opportunity. Browse more local programs in ${cityName}, ${stateInfo.code}.`,
-    };
-  }
-
-  const canonical = grantPath(grant);
+  const stateInfo = resolveStateParam(resolvedParams?.stateCode ?? "");
+  const cityName = cityNameFromSlug(resolvedParams?.citySlug ?? "");
+  const rawCategory =
+    typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
+  const category = formatCategory(rawCategory);
 
   return {
-    title: `${grant.title} | ${cityName}, ${stateInfo.code} grant`,
-    description: grant.summary ?? undefined,
-    alternates: { canonical },
-    openGraph: {
-      title: grant.title,
-      description: grant.summary ?? undefined,
-      type: "article",
-    },
+    title: `${cityName}, ${stateInfo.name} ${category ? category + " Grants" : "Grants"}`,
+    description: `Discover ${
+      category ? category.toLowerCase() + " " : ""
+    }grants and funding opportunities in ${cityName}, ${stateInfo.name}.`,
   };
 }
 
-export default async function LocalGrantDetailPage({
+export default async function LocalGrantsPage({
   params,
   searchParams,
 }: {
-  params: MaybePromise<LocalParams>;
-  searchParams?: MaybePromise<LocalSearchParams>;
+  params: Promise<{ stateCode: string; citySlug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedParams = await resolveRouteParams(params, "local.page.params");
-  const stateCode = typeof resolvedParams?.stateCode === "string" ? resolvedParams.stateCode : "";
-  const citySlug = typeof resolvedParams?.citySlug === "string" ? resolvedParams.citySlug : "";
-  const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
+  const resolvedParams = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
 
-  const stateInfo = resolveStateParam(stateCode);
+  // ✅ SAFETY GUARD
+  if (resolvedParams.stateCode?.toLowerCase() === "category") {
+    redirect(`/grants/category/${resolvedParams.citySlug}`);
+  }
+
+  const stateInfo = resolveStateParam(resolvedParams?.stateCode ?? "");
+  const citySlug = resolvedParams?.citySlug ?? "";
   const cityName = cityNameFromSlug(citySlug);
   const grant = await loadGrant(slug, searchParams);
 

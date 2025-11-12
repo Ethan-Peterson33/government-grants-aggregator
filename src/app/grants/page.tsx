@@ -19,14 +19,17 @@ export const runtime = "nodejs";
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const keyword = typeof searchParams?.keyword === "string" ? searchParams.keyword : undefined;
-  const legacyQuery = typeof searchParams?.query === "string" ? searchParams.query : undefined;
+  // ✅ Unwrap the async searchParams
+  const params = await searchParams;
+
+  const keyword = typeof params?.keyword === "string" ? params.keyword : undefined;
+  const legacyQuery = typeof params?.query === "string" ? params.query : undefined;
   const query = keyword ?? legacyQuery;
-  const category = typeof searchParams?.category === "string" ? searchParams.category : undefined;
-  const state = typeof searchParams?.state === "string" ? searchParams.state : undefined;
-  const agency = typeof searchParams?.agency === "string" ? searchParams.agency : undefined;
+  const category = typeof params?.category === "string" ? params.category : undefined;
+  const state = typeof params?.state === "string" ? params.state : undefined;
+  const agency = typeof params?.agency === "string" ? params.agency : undefined;
 
   const segments: string[] = ["Government Grants"];
   if (category) segments.unshift(`${category} grants`);
@@ -51,6 +54,7 @@ export async function generateMetadata({
     },
   };
 }
+
 
 
 export default async function GrantsIndexPage({

@@ -21,7 +21,16 @@ export type Grant = {
   agency_code?: string | null;
   open_date?: string | null;
   close_date?: string | null;
+
+  // 👇 Add this block
+  grant_categories?: {
+    category_code: string;
+    category_label: string;
+    slug: string;
+  } | null;
 };
+
+
 
 export type GrantJurisdiction = "federal" | "state" | "local";
 

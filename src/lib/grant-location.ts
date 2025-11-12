@@ -158,22 +158,35 @@ export function findStateInfo(value: string | null | undefined): StateInfo | nul
   return null;
 }
 
-export function resolveStateParam(param: string): { code: string; name: string } {
-  const info = findStateInfo(param);
+export function resolveStateParam(param?: string) {
+  if (!param || typeof param !== "string") {
+    return { code: "", name: "Unknown" };
+  }
+
+  const cleaned = param.trim();
+  if (!cleaned) return { code: "", name: "Unknown" };
+
+  const upper = cleaned.toUpperCase();
+  const info = stateByCode.get(upper);
   if (info) return { code: info.code, name: info.name };
 
-  const trimmed = param.trim();
-  if (trimmed.length === 2) {
-    const code = trimmed.toUpperCase();
+  if (cleaned.length === 2) {
+    const code = upper;
     const fallbackName = stateByCode.get(code)?.name ?? code;
     return { code, name: fallbackName };
   }
 
-  const slug = slugify(trimmed);
-  const name = wordsFromSlug(slug) || sentenceCase(trimmed.toLowerCase());
-  const code = trimmed ? trimmed.toUpperCase() : "US";
-  return { code, name: name || code };
+  const normalizedName = cleaned.replace(/-/g, " ");
+  const found = Array.from(stateByCode.values()).find(
+    (s) => s.name.toLowerCase() === normalizedName.toLowerCase()
+  );
+
+  if (found) return { code: found.code, name: found.name };
+
+  return { code: "", name: "Unknown" };
 }
+
+
 
 export function stateNameFromCode(code: string): string | null {
   const info = findStateInfo(code);

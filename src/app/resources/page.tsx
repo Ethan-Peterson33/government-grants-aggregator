@@ -27,7 +27,7 @@ const resources: Resource[] = [
     benefit: "Secure funding faster with proven talent.",
     href:
       "https://www.fiverr.com/search/gigs?query=grant%20writing&source=main_banner",
-    image: "/images/fiverr image.png",
+    image: "/images/fiverr.png",
     cta: "Get started now",
     featured: true,
   },
@@ -69,7 +69,7 @@ const resources: Resource[] = [
     benefit: "Protect your business and get funding-ready.",
     href: "https://www.shopify.com/tools/business-name-generator",
     image:
-      "https://images.unsplash.com/photo-1581093588401-22d8d8c68514?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=800&q=80",
     cta: "Launch Now",
   },
   {
@@ -153,7 +153,7 @@ export default function ResourcesPage() {
           <p className="text-lg text-slate-600">{pageDescription}</p>
         </header>
 
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-8 lg:grid-cols-2">
           {resources.map((resource) => (
             <article
               key={resource.name}
@@ -163,23 +163,30 @@ export default function ResourcesPage() {
                   : "mb-8 flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row"
               }
             >
-              <div
-                className={clsx(
-                  "relative overflow-hidden rounded-2xl bg-slate-100 shadow-inner",
-                  resource.featured
-                    ? "h-56 w-full md:h-auto md:min-h-[220px] md:w-1/3"
-                    : "h-44 w-full md:h-40 md:w-40"
-                )}
-              >
-                <Image
-                  src={resource.image}
-                  alt={resource.name}
-                  fill
-                  sizes={resource.featured ? "(min-width: 1024px) 280px, 100vw" : "(min-width: 1024px) 160px, 50vw"}
-                  priority={resource.featured}
-                  className="object-cover"
-                />
-              </div>
+        <div
+          className={clsx(
+            "relative overflow-hidden rounded-2xl",
+            resource.featured
+              ? "mx-auto w-40 h-40 md:w-48 md:h-48" // Fiverr logo container
+              : "w-full aspect-square bg-slate-100" // regular photos
+          )}
+        >
+          <Image
+            src={resource.image}
+            alt={resource.name}
+            fill
+            sizes="(min-width: 1024px) 280px, 100vw"
+            priority={resource.featured}
+            className={clsx(
+              "rounded-2xl transition-transform duration-300",
+              resource.featured ? "object-cover" : "object-cover"
+            )}
+          />
+        </div>
+
+
+
+
 
 
               <div className="flex flex-1 flex-col justify-between space-y-4">

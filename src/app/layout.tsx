@@ -34,7 +34,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const menuItems: MenuItem[] = [
-    { label: "Home", href: "/" },
     { label: "Find Grants", href: "/grants", isPrimary: true },
     { label: "Agencies", href: "/agencies" },
     { label: "Resources", href: "/resources" },

@@ -191,12 +191,12 @@ export default async function GrantsIndexPage({
                 {categoryOptions[0].label} programs
               </Link>
             )}
-            <Link
+           {/* <Link
               href="/grants?has_apply_link=1"
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               Grants with apply links
-            </Link>
+            </Link>*/}
           </div>
         </header>
 

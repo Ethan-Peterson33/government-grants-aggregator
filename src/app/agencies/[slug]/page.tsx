@@ -175,11 +175,7 @@ const agency = await resolveAgency(slugParam, "agency.page");
       <header className="space-y-3">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold text-slate-900">{agency.agency_name}</h1>
-          {agency.agency_code && (
-            <p className="text-sm text-slate-600">
-              Agency code: <span className="font-mono text-slate-700">{agency.agency_code}</span>
-            </p>
-          )}
+    
           {agency.description && <p className="text-slate-700">{agency.description}</p>}
           {agency.website && (
             <p className="text-sm">

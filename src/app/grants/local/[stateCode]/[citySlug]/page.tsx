@@ -1,36 +1,33 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { cityNameFromSlug, resolveStateParam } from "@/lib/grant-location";
-import { wordsFromSlug } from "@/lib/strings";
+import { normalizeCategory } from "@/lib/strings";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { safeNumber, searchGrants } from "@/lib/search";
 import type { Grant } from "@/lib/types";
 
 const PAGE_SIZE = 12;
 
-function formatCategory(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  return wordsFromSlug(value.toLowerCase().replace(/\s+/g, "-"));
-}
-
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; citySlug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ stateCode: string; citySlug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const cityName = cityNameFromSlug(params.citySlug);
-  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
-  const category = formatCategory(rawCategory);
+  const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
-  const title = category
-    ? `${category} Grants in ${cityName}, ${stateInfo.code}`
-    : `${cityName}, ${stateInfo.code} Grants`;
+  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+  const cityName = cityNameFromSlug(resolvedParams.citySlug);
+  const rawCategory = typeof resolvedSearchParams?.category === "string" ? resolvedSearchParams.category : undefined;
+  const category = rawCategory ? normalizeCategory(rawCategory) : undefined;
+
+  const title = `Local Grants in ${cityName}, ${stateInfo.code} | Grant Directory`;
   const description = category
     ? `Find ${category.toLowerCase()} grants supporting organizations in ${cityName}, ${stateInfo.name}.`
     : `Discover local funding initiatives helping ${cityName}, ${stateInfo.name} communities grow.`;
@@ -42,16 +39,23 @@ export default async function LocalGrantsPage({
   params,
   searchParams,
 }: {
-  params: { stateCode: string; citySlug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ stateCode: string; citySlug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const citySlug = params.citySlug;
+  const resolvedParams = await params;
+  if (resolvedParams.stateCode?.toLowerCase() === "category") {
+    redirect(`/grants/category/${resolvedParams.citySlug}`);
+  }
+
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+  const citySlug = resolvedParams.citySlug;
   const cityName = cityNameFromSlug(citySlug);
-  const page = safeNumber(searchParams?.page, 1);
-  const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, PAGE_SIZE));
-  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
-  const category = formatCategory(rawCategory);
+  const page = safeNumber(resolvedSearchParams?.page, 1);
+  const pageSize = Math.min(50, safeNumber(resolvedSearchParams?.pageSize, PAGE_SIZE));
+  const rawCategory = typeof resolvedSearchParams?.category === "string" ? resolvedSearchParams.category : undefined;
+  const category = rawCategory ? normalizeCategory(rawCategory) : undefined;
 
   const { grants, total } = await searchGrants({
     stateCode: stateInfo.code,
@@ -89,7 +93,7 @@ export default async function LocalGrantsPage({
       <Breadcrumb items={breadcrumbItems} />
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold text-slate-900">
-          {category ? `${category} grants in ${cityName}` : `${cityName}, ${stateInfo.code} grants`}
+          {category ? `${category} Grants in ${cityName}` : `Local Grants in ${cityName}, ${stateInfo.code}`}
         </h1>
         <p className="text-slate-600">
           Explore local programs funding organizations in {cityName}. Filter by category to find opportunities tailored to your

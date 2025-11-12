@@ -16,3 +16,18 @@ export function wordsFromSlug(value: string): string {
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 }
+
+export function normalizeCategory(value: string | null | undefined): string {
+  if (typeof value !== "string") {
+    return "Other";
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "Other";
+  }
+
+  const sanitized = trimmed.replace(/[_\s]+/g, "-").toLowerCase();
+  const normalized = wordsFromSlug(sanitized);
+  return normalized || "Other";
+}

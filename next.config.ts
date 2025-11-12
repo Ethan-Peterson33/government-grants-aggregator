@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/grants/local/category/:slug",
+        destination: "/grants/category/:slug",
+      },
+    ];
+  },
   async redirects() {
     return [
       {

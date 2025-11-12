@@ -146,7 +146,7 @@ export const STATEWIDE_CITY_LABELS = Array.from(
 );
 
 export function findStateInfo(value: string | null | undefined): StateInfo | null {
-  if (!value) return null;
+  if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
   const upper = trimmed.toUpperCase();
@@ -159,7 +159,7 @@ export function findStateInfo(value: string | null | undefined): StateInfo | nul
 }
 
 export function resolveStateParam(param?: string) {
-  if (!param || typeof param !== "string") {
+  if (typeof param !== "string") {
     return { code: "", name: "Unknown" };
   }
 
@@ -171,16 +171,16 @@ export function resolveStateParam(param?: string) {
   if (info) return { code: info.code, name: info.name };
 
   if (cleaned.length === 2) {
-    const code = upper;
-    const fallbackName = stateByCode.get(code)?.name ?? code;
-    return { code, name: fallbackName };
+    const fallbackName = stateByCode.get(upper)?.name ?? upper;
+    return { code: upper, name: fallbackName };
   }
 
   const normalizedName = cleaned.replace(/-/g, " ");
-  const found = Array.from(stateByCode.values()).find(
-    (s) => s.name.toLowerCase() === normalizedName.toLowerCase()
-  );
+  const lower = normalizedName.toLowerCase();
+  const foundByName = stateByName.get(lower);
+  if (foundByName) return { code: foundByName.code, name: foundByName.name };
 
+  const found = Array.from(stateByCode.values()).find((s) => s.name.toLowerCase() === lower);
   if (found) return { code: found.code, name: found.name };
 
   return { code: "", name: "Unknown" };
@@ -206,7 +206,7 @@ export function stateNameCandidatesFromCode(code: string): string[] {
 }
 
 export function isFederalStateValue(value: string | null | undefined): boolean {
-  if (!value) return true;
+  if (typeof value !== "string") return true;
   const trimmed = value.trim();
   if (!trimmed) return true;
   const normalized = slugify(trimmed);
@@ -215,7 +215,7 @@ export function isFederalStateValue(value: string | null | undefined): boolean {
 }
 
 export function isStatewideCity(value: string | null | undefined): boolean {
-  if (!value) return true;
+  if (typeof value !== "string") return true;
   const trimmed = value.trim();
   if (!trimmed) return true;
   const normalized = slugify(trimmed);
@@ -236,7 +236,7 @@ export function inferGrantLocation(
   }
 
   const stateInfo = findStateInfo(grant.state);
-  const rawState = (grant.state ?? "").trim();
+  const rawState = typeof grant.state === "string" ? grant.state.trim() : "";
   const fallbackStateCode = rawState.slice(0, 2) || "US";
   const stateCode = (stateInfo?.code ?? fallbackStateCode).toUpperCase();
 
@@ -244,7 +244,8 @@ export function inferGrantLocation(
     return { jurisdiction: "state", stateCode };
   }
 
-  const citySlug = slugify((grant.city ?? "").trim());
+  const rawCity = typeof grant.city === "string" ? grant.city.trim() : "";
+  const citySlug = rawCity ? slugify(rawCity) : "";
   if (!citySlug || STATEWIDE_KEYWORDS.some((keyword) => citySlug.includes(keyword))) {
     return { jurisdiction: "state", stateCode };
   }
@@ -264,7 +265,8 @@ export function cityNameFromSlug(slug: string): string {
 export function normalizeStateCode(value: string | null | undefined): string | null {
   const info = findStateInfo(value ?? undefined);
   if (info) return info.code;
-  const trimmed = value?.trim();
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
   if (!trimmed) return null;
   if (trimmed.length === 2) return trimmed.toUpperCase();
   return null;

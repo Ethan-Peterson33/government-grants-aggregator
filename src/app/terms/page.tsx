@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 const pageTitle = "Terms of Use";
 const pageDescription =
@@ -100,8 +101,11 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-2xl font-semibold text-slate-900">Contact</h2>
             <p className="text-base text-slate-600">
-              For questions about these terms, email legal@grantdirectory.org or
-              mail GrantDirectory.org, 123 Civic Tech Way, Washington, DC 20001.
+              For questions about these terms, please reach us through our{" "}
+              <Link href="/contact" className="text-blue-700 hover:text-blue-900">
+                contact page
+              </Link>
+              .
             </p>
           </section>
         </div>

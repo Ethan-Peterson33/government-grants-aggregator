@@ -59,7 +59,7 @@ export default async function AgenciesIndexPage() {
           No agencies found yet. Check back soon as we continue to add more data.
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
           {agencies.map((agency) => (
             <article
               key={agency.id}

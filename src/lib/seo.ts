@@ -13,7 +13,8 @@ export function generateGrantJsonLd(grant: Grant, options?: { path?: string }) {
   const grantUrl = `${SITE_URL}${path}`;
   const plainDescription = grant.description
     ? grant.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || undefined
-    : undefined;
+    : undefined; 
+    
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Grant",

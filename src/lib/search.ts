@@ -139,7 +139,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
       if (hasGrantCategoryFk) {
         // ✅ Match by label only — safer and avoids logic tree parse errors
-        q = q.ilike("grant_categories.category_label", pattern, { foreignTable: "grant_categories" });
+        q = q.ilike("grant_categories.category_label", pattern);
       } else {
         q = q.ilike("category", pattern);
       }

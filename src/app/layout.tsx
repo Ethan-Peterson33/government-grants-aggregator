@@ -66,21 +66,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         {/* Main content */}
-              <section className="bg-blue-50 border-b border-blue-100 py-12">
-                <div className="container-grid text-center space-y-4">
-                  <h1 className="text-3xl font-bold text-blue-900">Find Government Grants</h1>
-                  <p className="text-slate-600">
-                    Explore verified funding opportunities from federal and state agencies.
-                  </p>
-                  <Link
-                    href="/grants"
-                    className="inline-block bg-blue-700 text-white font-medium px-6 py-2 rounded-md hover:bg-blue-800"
-                  >
-                    Start Searching
-                  </Link>
-                </div>
-              </section>
-
         <main className="flex-1">{children}</main>
 
         {/* Footer */}

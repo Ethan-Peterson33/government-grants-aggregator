@@ -1,4 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
+import { validate as isUuid } from "uuid";
 import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
@@ -359,16 +360,29 @@ export function filterGrantsLocally(
   };
 }
 
-/** Get a single grant by ID */
+/** Normalize UUID or fallback to short ID */
+function normalizeGrantId(rawId: string): string | null {
+  if (!rawId) return null;
+  const cleaned = rawId.replace(/-\d+$/, "");
+  return isUuid(cleaned) ? cleaned : null;
+}
+
+/** Get a single grant by ID, with UUID safety and short-ID fallback */
 export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();
   if (!supabase) return null;
+
+  const normalizedId = normalizeGrantId(id);
+  if (!normalizedId) {
+    console.warn("⚠️ Invalid UUID format passed to getGrantById:", id);
+    return null;
+  }
 
   for (const table of TABLE_FALLBACK_ORDER) {
     const { data, error } = (await supabase
       .from(table)
       .select("*")
-      .eq("id", id)
+      .eq("id", normalizedId)
       .maybeSingle()) as unknown as {
       data: Grant | null;
       error: PostgrestError | null;
@@ -376,12 +390,17 @@ export async function getGrantById(id: string): Promise<Grant | null> {
 
     if (error) {
       console.error("❌ getGrantById error:", error);
+      if (error.code === "22P02" || error.message?.includes("invalid input syntax for type uuid")) {
+        console.log("🔁 Falling back to short-ID lookup");
+        return await getGrantByShortId(id.split("-")[0]);
+      }
       break;
     }
+
     if (data) return data;
   }
 
-  return null;
+  return await getGrantByShortId(id.split("-")[0]);
 }
 
 /** Get grant by short ID prefix */

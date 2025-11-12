@@ -5,23 +5,13 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
-import {
-  extractSearchParam,
-  resolveRouteParams,
-  resolveSearchParams,
-  type MaybePromise,
-  type SearchParamsLike,
-} from "@/app/grants/_components/route-params";
-import { cityNameFromSlug, resolveStateParam } from "@/lib/grant-location";
-import { inferGrantLocation } from "@/lib/grant-location";
+import { extractSearchParam, resolveSearchParams } from "@/app/grants/_components/route-params";
+import { cityNameFromSlug, inferGrantLocation, resolveStateParam } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
 import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
-
-type LocalParams = { stateCode: string; citySlug: string; slug: string };
-
-type LocalSearchParams = SearchParamsLike;
+import { normalizeCategory } from "@/lib/strings";
 
 export async function generateMetadata({
   params,
@@ -38,7 +28,7 @@ export async function generateMetadata({
   const cityName = cityNameFromSlug(resolvedParams?.citySlug ?? "");
   const rawCategory =
     typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
-  const category = formatCategory(rawCategory);
+  const category = rawCategory ? normalizeCategory(rawCategory) : undefined;
 
   return {
     title: `${cityName}, ${stateInfo.name} ${category ? category + " Grants" : "Grants"}`,
@@ -52,19 +42,19 @@ export default async function LocalGrantsPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ stateCode: string; citySlug: string }>;
+  params: Promise<{ stateCode: string; citySlug: string; slug: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const resolvedParams = await params;
-  const resolvedSearch = searchParams ? await searchParams : {};
+  const { stateCode, citySlug: citySlugParam, slug } = resolvedParams;
 
   // ✅ SAFETY GUARD
-  if (resolvedParams.stateCode?.toLowerCase() === "category") {
-    redirect(`/grants/category/${resolvedParams.citySlug}`);
+  if (stateCode?.toLowerCase() === "category") {
+    redirect(`/grants/category/${citySlugParam}`);
   }
 
-  const stateInfo = resolveStateParam(resolvedParams?.stateCode ?? "");
-  const citySlug = resolvedParams?.citySlug ?? "";
+  const stateInfo = resolveStateParam(stateCode ?? "");
+  const citySlug = citySlugParam ?? "";
   const cityName = cityNameFromSlug(citySlug);
   const grant = await loadGrant(slug, searchParams);
 

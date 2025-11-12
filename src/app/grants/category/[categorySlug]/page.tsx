@@ -5,18 +5,19 @@ import { Pagination } from "@/components/grants/pagination";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { safeNumber, searchGrants } from "@/lib/search";
 import type { GrantFilters } from "@/lib/types";
-import { wordsFromSlug } from "@/lib/strings";
+import { normalizeCategory } from "@/lib/strings";
 
 const PAGE_SIZE = 12;
 
-function normalizeCategory(slug: string) {
-  return wordsFromSlug(slug.toLowerCase());
-}
-
-export async function generateMetadata({ params }: { params: { categorySlug: string } }): Promise<Metadata> {
-  const category = normalizeCategory(params.categorySlug);
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ categorySlug: string }>;
+}): Promise<Metadata> {
+  const { categorySlug } = await params;
+  const category = normalizeCategory(categorySlug);
   return {
-    title: `${category} Grants`,
+    title: `${category} Grants | Grant Directory`,
     description: `Browse active ${category.toLowerCase()} grants across agencies and jurisdictions.`,
   };
 }
@@ -25,17 +26,21 @@ export default async function CategoryGrantsPage({
   params,
   searchParams,
 }: {
-  params: { categorySlug: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ categorySlug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const page = safeNumber(searchParams?.page, 1);
-  const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, PAGE_SIZE));
-  const jurisdictionParam = typeof searchParams?.jurisdiction === "string" ? searchParams.jurisdiction : undefined;
+  const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  const page = safeNumber(resolvedSearchParams?.page, 1);
+  const pageSize = Math.min(50, safeNumber(resolvedSearchParams?.pageSize, PAGE_SIZE));
+  const jurisdictionParam =
+    typeof resolvedSearchParams?.jurisdiction === "string" ? resolvedSearchParams.jurisdiction : undefined;
   const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local"];
   const jurisdiction = allowedJurisdictions.includes(jurisdictionParam as GrantFilters["jurisdiction"])
     ? (jurisdictionParam as GrantFilters["jurisdiction"])
     : undefined;
-  const category = normalizeCategory(params.categorySlug);
+  const category = normalizeCategory(resolvedParams.categorySlug);
 
   const { grants, total } = await searchGrants({
     page,
@@ -47,7 +52,7 @@ export default async function CategoryGrantsPage({
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Grants", href: "/grants" },
-    { label: category, href: `/grants/category/${params.categorySlug}` },
+    { label: category, href: `/grants/category/${resolvedParams.categorySlug}` },
   ];
 
   const getHref = (targetPage: number) => {
@@ -56,7 +61,9 @@ export default async function CategoryGrantsPage({
     if (pageSize !== PAGE_SIZE) qs.set("pageSize", String(pageSize));
     if (jurisdiction) qs.set("jurisdiction", jurisdiction);
     const query = qs.toString();
-    return query ? `/grants/category/${params.categorySlug}?${query}` : `/grants/category/${params.categorySlug}`;
+    return query
+      ? `/grants/category/${resolvedParams.categorySlug}?${query}`
+      : `/grants/category/${resolvedParams.categorySlug}`;
   };
 
   const itemListJsonLd = generateItemListJsonLd(grants);
@@ -65,7 +72,7 @@ export default async function CategoryGrantsPage({
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-slate-900">{category} grants</h1>
+        <h1 className="text-3xl font-semibold text-slate-900">{category} Grants</h1>
         <p className="text-slate-600">
           Discover current {category.toLowerCase()} funding across federal, state, and local programs.
         </p>

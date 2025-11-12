@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import Link from "next/link";
 import Image from "next/image";
+import clsx from "clsx";
 
 const pageTitle = "Resources";
 const pageDescription =
@@ -162,16 +163,23 @@ export default function ResourcesPage() {
                   : "mb-8 flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row"
               }
             >
-<div className="w-full rounded-xl bg-slate-100 overflow-hidden aspect-square">
-  <Image
-    src={resource.image}
-    alt={resource.name}
-    width={220}
-    height={120}
-    priority={resource.featured}
-    className="object-cover w-full h-full"
-  />
-</div>
+              <div
+                className={clsx(
+                  "relative overflow-hidden rounded-2xl bg-slate-100 shadow-inner",
+                  resource.featured
+                    ? "h-56 w-full md:h-auto md:min-h-[220px] md:w-1/3"
+                    : "h-44 w-full md:h-40 md:w-40"
+                )}
+              >
+                <Image
+                  src={resource.image}
+                  alt={resource.name}
+                  fill
+                  sizes={resource.featured ? "(min-width: 1024px) 280px, 100vw" : "(min-width: 1024px) 160px, 50vw"}
+                  priority={resource.featured}
+                  className="object-cover"
+                />
+              </div>
 
 
               <div className="flex flex-1 flex-col justify-between space-y-4">

@@ -82,21 +82,18 @@ export default async function AgenciesIndexPage() {
                 </p>
               )}
 
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                {agency.agency_code && (
-                  <span>Code: {agency.agency_code}</span>
-                )}
-                {agency.website && (
+              {agency.website && (
+                <div className="mt-3 text-xs">
                   <a
                     href={agency.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-700 hover:text-blue-900"
+                    className="font-semibold text-blue-700 hover:text-blue-900"
                   >
                     Visit site
                   </a>
-                )}
-              </div>
+                </div>
+              )}
             </article>
           ))}
         </div>

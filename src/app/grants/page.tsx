@@ -175,10 +175,6 @@ export default async function GrantsIndexPage({
             >
               Federal grants overview
             </Link>
-
-          
-
-        {/*
             {stateOptions[0] && (
               <Link
                 href={`/grants?state=${encodeURIComponent(stateOptions[0].value)}`}
@@ -187,27 +183,20 @@ export default async function GrantsIndexPage({
                 Funding in {stateOptions[0].label}
               </Link>
             )}
-
-          {categoryOptions[0] && (
+            {categoryOptions[0] && (
               <Link
                 href={`/grants?category=${encodeURIComponent(categoryOptions[0].value)}`}
                 className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
               >
                 {categoryOptions[0].label} programs
               </Link>
-              
-                <Link
+            )}
+            <Link
               href="/grants?has_apply_link=1"
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               Grants with apply links
             </Link>
-              
-              
-              } 
-            )
-            */  
-            }
           </div>
         </header>
 

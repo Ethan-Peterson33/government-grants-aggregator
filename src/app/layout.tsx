@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ReactNode } from "react";
 import Link from "next/link";
-import { MainNavigation } from "@/components/main-navigation";
+import { Menu, type MenuItem } from "@/components/menu";
 
 const siteName = "Grant Directory";
 const tagline = "Verified government funding opportunities in one place.";
@@ -33,40 +33,39 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const menuItems: MenuItem[] = [
+    { label: "Home", href: "/" },
+    { label: "Find Grants", href: "/grants", isPrimary: true },
+    { label: "Agencies", href: "/agencies" },
+    { label: "Resources", href: "/resources" },
+    { label: "About", href: "/about" },
+    { label: "Contact", href: "/contact" },
+  ];
+
   return (
     <html lang="en" className="h-full bg-slate-50 scroll-smooth">
       <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
         {/* Header */}
-            <header className="border-b bg-blue-700 text-white shadow-sm">
-              <div className="container-grid flex items-center justify-between py-3">
-                <Link href="/" className="text-xl font-semibold">
+        <header className="border-b border-blue-100 bg-white/90 shadow-sm backdrop-blur">
+          <div className="container-grid space-y-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <Link href="/" className="text-2xl font-semibold text-blue-700">
                   Grant Directory
                 </Link>
-                <p className="text-sm opacity-80">Verified government funding opportunities</p>
-                <Link
-                  href="/grants"
-                  className="bg-white text-blue-700 font-semibold px-4 py-2 rounded-md hover:bg-blue-50"
-                >
-                  Search Grants
-                </Link>
+                <p className="text-sm text-slate-600">Verified government funding opportunities</p>
               </div>
-            </header>
+              <Link
+                href="/grants"
+                className="inline-flex items-center justify-center rounded-full border border-blue-100 bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              >
+                Search Grants
+              </Link>
+            </div>
+            <Menu items={menuItems} className="justify-start" />
+          </div>
+        </header>
         {/* Main content */}
-              <section className="bg-blue-50 border-b border-blue-100 py-12">
-                <div className="container-grid text-center space-y-4">
-                  <h1 className="text-3xl font-bold text-blue-900">Find Government Grants</h1>
-                  <p className="text-slate-600">
-                    Explore verified funding opportunities from federal and state agencies.
-                  </p>
-                  <Link
-                    href="/grants"
-                    className="inline-block bg-blue-700 text-white font-medium px-6 py-2 rounded-md hover:bg-blue-800"
-                  >
-                    Start Searching
-                  </Link>
-                </div>
-              </section>
-
         <main className="flex-1">{children}</main>
 
         {/* Footer */}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 const pageTitle = "Privacy Policy";
 const pageDescription =
@@ -107,9 +108,11 @@ export default function PrivacyPage() {
           <section className="space-y-3">
             <h2 className="text-2xl font-semibold text-slate-900">Contact</h2>
             <p className="text-base text-slate-600">
-              Questions about privacy can be sent to privacy@grantdirectory.org or
-              mailed to GrantDirectory.org, 123 Civic Tech Way, Washington, DC
-              20001.
+              Questions about privacy can be submitted through our{" "}
+              <Link href="/contact" className="text-blue-700 hover:text-blue-900">
+                contact page
+              </Link>
+              , and we&apos;ll respond promptly.
             </p>
           </section>
         </div>

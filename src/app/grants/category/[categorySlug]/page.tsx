@@ -55,17 +55,6 @@ export default async function CategoryGrantsPage({
     { label: category, href: `/grants/category/${resolvedParams.categorySlug}` },
   ];
 
-  const getHref = (targetPage: number) => {
-    const qs = new URLSearchParams();
-    if (targetPage > 1) qs.set("page", String(targetPage));
-    if (pageSize !== PAGE_SIZE) qs.set("pageSize", String(pageSize));
-    if (jurisdiction) qs.set("jurisdiction", jurisdiction);
-    const query = qs.toString();
-    return query
-      ? `/grants/category/${resolvedParams.categorySlug}?${query}`
-      : `/grants/category/${resolvedParams.categorySlug}`;
-  };
-
   const itemListJsonLd = generateItemListJsonLd(grants);
 
   return (
@@ -89,7 +78,13 @@ export default async function CategoryGrantsPage({
           )}
         </div>
         {grants.length > 0 && (
-          <Pagination total={total} pageSize={pageSize} currentPage={page} getHref={getHref} />
+          <Pagination
+            total={total}
+            pageSize={pageSize}
+            currentPage={page}
+            basePath={`/grants/category/${resolvedParams.categorySlug}`}
+            staticParams={jurisdiction ? { jurisdiction } : undefined}
+          />
         )}
       </section>
 

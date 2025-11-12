@@ -15,6 +15,7 @@ interface PaginationBaseProps {
 type PaginationLinkProps = PaginationBaseProps & {
   basePath: string;
   rawCategory?: string;
+  staticParams?: Record<string, string | undefined>;
   onPageChange?: undefined;
   getHref?: undefined;
 };
@@ -130,8 +131,15 @@ const Pagination: React.FC<PaginationProps> = (props) => {
   const buildHref = "getHref" in props && typeof props.getHref === "function"
     ? props.getHref
     : (page: number) => {
-        const { basePath, rawCategory } = props as PaginationLinkProps;
+        const { basePath, rawCategory, staticParams } = props as PaginationLinkProps;
         const params = new URLSearchParams();
+        if (staticParams) {
+          Object.entries(staticParams).forEach(([key, value]) => {
+            if (typeof value === "string" && value.length > 0) {
+              params.set(key, value);
+            }
+          });
+        }
         if (page > 1) {
           params.set("page", String(page));
         }

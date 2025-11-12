@@ -133,20 +133,21 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     }
 
     /** Category filter (join-based) */
-    if (sanitizedCategory) {
-      if (hasGrantCategoryFk) {
-        q = q.or(
-          [
-            `grant_categories.slug.ilike.%${sanitizedCategory}%`,
-            `grant_categories.category_label.ilike.%${sanitizedCategory}%`,
-            `category.ilike.%${sanitizedCategory}%`,
-          ].join(","),
-          { foreignTable: "grant_categories" }
-        );
-      } else {
-        q = q.ilike("category", `%${sanitizedCategory}%`);
-      }
-    }
+if (sanitizedCategory) {
+  const pattern = `%${sanitizedCategory}%`;
+  if (hasGrantCategoryFk) {
+    q = q.or(
+      [
+        `grant_categories.slug.ilike."${pattern}"`,
+        `grant_categories.category_label.ilike."${pattern}"`,
+        `category.ilike."${pattern}"`,
+      ].join(","),
+      { foreignTable: "grant_categories" }
+    );
+  } else {
+    q = q.ilike("category", pattern);
+  }
+}
 
     /** State filter */
     if (stateCode && hasStateColumn) {

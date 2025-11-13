@@ -1,5 +1,4 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import { validate as isUuid } from "uuid";
 import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,

@@ -119,14 +119,14 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
               }
             : {
                 label: `${categoryOptions[0].label} grants`,
-                href: `/grants?category=${encodeURIComponent(categoryOptions[0].value)}`,
+                href: `/grants?category=${slugify(categoryOptions[0].value)}`,
               };
         })()
       : null,
     stateOptions[0] && stateOptions[0].value !== state
       ? {
           label: `Funding in ${stateOptions[0].label}`,
-          href: `/grants?state=${encodeURIComponent(stateOptions[0].value)}`,
+          href: `/grants?state=${slugify(stateOptions[0].value)}`,
         }
       : null,
     agencyOptions[0] && agencyOptions[0].value !== agency
@@ -139,7 +139,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
               }
             : {
                 label: `Programs from ${agencyOptions[0].label}`,
-                href: `/grants?agency=${encodeURIComponent(agencyOptions[0].value)}`,
+                href: `/grants?agency=${slugify(agencyOptions[0].value)}`,
               };
         })()
       : null,
@@ -184,7 +184,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
             </Link>
               {randomState && (
           <Link
-            href={`/grants?state=${encodeURIComponent(randomState.value)}`}
+            href={`/grants?state=${slugify(randomState.value)}`}
             className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
           >
             Funding in {randomState.label}
@@ -192,7 +192,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
         )}
                 {randomCategory && (
             <Link
-              href={`/grants?category=${encodeURIComponent(randomCategory.value)}`}
+              href={`/grants?category=${slugify(randomCategory.value)}`}
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               {randomCategory.label} programs

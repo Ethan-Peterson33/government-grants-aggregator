@@ -45,6 +45,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className="h-full bg-slate-50 scroll-smooth">
       <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
         {/* Header */}
+        <meta name="fo-verify" content="27a4659d-bbcc-4ab4-9bc0-17cfd3f92107" />
         <header className="border-b border-blue-100 bg-white/90 shadow-sm backdrop-blur">
           <div className="container-grid space-y-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-4">

@@ -106,7 +106,8 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
-
+const [randomState] = pickRandom(stateOptions, 1);
+const [randomCategory] = pickRandom(categoryOptions, 1);
   const relatedLinks = [
     categoryOptions[0] && categoryOptions[0].value !== category
       ? (() => {
@@ -181,22 +182,22 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
             >
               Federal grants overview
             </Link>
-            {stateOptions[0] && (
-              <Link
-                href={`/grants?state=${encodeURIComponent(stateOptions[0].value)}`}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-              >
-                Funding in {stateOptions[0].label}
-              </Link>
-            )}
-            {categoryOptions[0] && (
-              <Link
-                href={`/grants/category/${slugify(categoryOptions[0].value)}`}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-              >
-                {categoryOptions[0].label} programs
-              </Link>
-            )}
+              {randomState && (
+          <Link
+            href={`/grants?state=${encodeURIComponent(randomState.value)}`}
+            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+          >
+            Funding in {randomState.label}
+          </Link>
+        )}
+                {randomCategory && (
+            <Link
+              href={`/grants?category=${encodeURIComponent(randomCategory.value)}`}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+            >
+              {randomCategory.label} programs
+            </Link>
+)}
            {/* <Link
               href="/grants?has_apply_link=1"
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
@@ -248,16 +249,16 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
                 By location
               </h2>
               <ul className="space-y-1 text-sm">
-                {stateOptions.slice(0, 2).map((opt) => (
-                  <li key={opt.value}>
-                    <Link
-                      href={`/grants?state=${encodeURIComponent(opt.value)}`}
-                      className="text-blue-700 hover:text-blue-900"
-                    >
-                      Funding in {opt.label}
-                    </Link>
-                  </li>
-                ))}
+                      {randomState && (
+                      <li key={randomState.value}>
+                        <Link
+                          href={`/grants?state=${encodeURIComponent(randomState.value)}`}
+                          className="text-blue-700 hover:text-blue-900"
+                        >
+                          Funding in {randomState.label}
+                        </Link>
+                      </li>
+                    )}
                 <li className="text-slate-500 text-xs">
                   More states will appear here as coverage expands.
                 </li>
@@ -269,16 +270,16 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
                 By program type
               </h2>
               <ul className="space-y-1 text-sm">
-                {categoryOptions.slice(0, 2).map((opt) => (
-                  <li key={opt.value}>
-                    <Link
-                      href={`/grants?category=${encodeURIComponent(opt.value)}`}
-                      className="text-blue-700 hover:text-blue-900"
-                    >
-                      {opt.label} grants
-                    </Link>
-                  </li>
-                ))}
+                   {randomCategory && (
+                    <li key={randomCategory.value}>
+                      <Link
+                        href={`/grants?category=${encodeURIComponent(randomCategory.value)}`}
+                        className="text-blue-700 hover:text-blue-900"
+                      >
+                        {randomCategory.label} grants
+                      </Link>
+                    </li>
+    )}
                 <li>
                   <Link href="/resources" className="text-blue-700 hover:text-blue-900">
                     Tools for grant writing & planning

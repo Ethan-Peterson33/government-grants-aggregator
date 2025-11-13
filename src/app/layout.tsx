@@ -47,6 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 return (
   <html lang="en" className="h-full bg-slate-50 scroll-smooth">
     <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
+      
       {/* Header */}
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="container-grid space-y-4 py-4">
@@ -104,6 +105,8 @@ return (
           </nav>
         </div>
       </footer>
+      <script type="text/javascript" src="https://s.skimresources.com/js/294404X1781688.skimlinks.js"></script>
+
     </body>
   </html>
 );

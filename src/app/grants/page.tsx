@@ -252,7 +252,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
                       {randomState && (
                       <li key={randomState.value}>
                         <Link
-                          href={`/grants?state=${encodeURIComponent(randomState.value)}`}
+                          href={`/grants?state=${slugify(randomState.value)}`}
                           className="text-blue-700 hover:text-blue-900"
                         >
                           Funding in {randomState.label}
@@ -273,7 +273,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
                    {randomCategory && (
                     <li key={randomCategory.value}>
                       <Link
-                        href={`/grants?category=${encodeURIComponent(randomCategory.value)}`}
+                        href={`/grants?category=${slugify(randomCategory.value)}`}
                         className="text-blue-700 hover:text-blue-900"
                       >
                         {randomCategory.label} grants

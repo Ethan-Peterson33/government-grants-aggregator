@@ -45,8 +45,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className="h-full bg-slate-50 scroll-smooth">
       <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
         {/* Header */}
-        <meta name='impact-site-verification' value='5249839a-51c4-4652-9216-0db5276e16b7' />
-        <header className="border-b border-blue-100 bg-white/90 shadow-sm backdrop-blur">
+        <meta name="impact-site-verification" content="5249839a-51c4-4652-9216-0db5276e16b7" />
           <div className="container-grid space-y-4 py-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>

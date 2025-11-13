@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     description:
       "Find verified government and nonprofit funding opportunities nationwide.",
   },
+  other: {
+    "impact-site-verification": "5249839a-51c4-4652-9216-0db5276e16b7",
+  }
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -41,64 +44,68 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     { label: "Contact", href: "/contact" },
   ];
 
-  return (
-    <html lang="en" className="h-full bg-slate-50 scroll-smooth">
-      <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
-        {/* Header */}
-        <meta name="impact-site-verification" content="5249839a-51c4-4652-9216-0db5276e16b7" />
-          <div className="container-grid space-y-4 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <Link href="/" className="text-2xl font-semibold text-blue-700">
-                  Grant Directory
-                </Link>
-                <p className="text-sm text-slate-600">Verified government funding opportunities</p>
-              </div>
-              <Link
-                href="/grants"
-                className="inline-flex items-center justify-center rounded-full border border-blue-100 bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-              >
-                Search Grants
-              </Link>
-            </div>
-            <Menu items={menuItems} className="justify-start" />
-          </div>
-        </header>
-        {/* Main content */}
-        <main className="flex-1">{children}</main>
-
-        {/* Footer */}
-        <footer className="border-t border-slate-200 bg-white py-8 text-sm text-slate-600">
-          <div className="container-grid flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+return (
+  <html lang="en" className="h-full bg-slate-50 scroll-smooth">
+    <body className="flex min-h-screen flex-col font-sans antialiased text-slate-800">
+      {/* Header */}
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="container-grid space-y-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p>
-                &copy; {new Date().getFullYear()} {siteName}. All rights
-                reserved.
-              </p>
-              <p className="text-xs text-slate-500">
-                Built to simplify access to public funding.
+              <Link href="/" className="text-2xl font-semibold text-blue-700">
+                {siteName}
+              </Link>
+              <p className="text-sm text-slate-600">
+                Verified government funding opportunities
               </p>
             </div>
-            <nav className="flex flex-wrap items-center gap-4">
-              <Link href="/about" className="hover:text-slate-900">
-                About
-              </Link>
-              <Link href="/resources" className="hover:text-slate-900">
-                Resources
-              </Link>
-              <Link href="/privacy" className="hover:text-slate-900">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-slate-900">
-                Terms
-              </Link>
-              <Link href="/contact" className="hover:text-slate-900">
-                Contact
-              </Link>
-            </nav>
+            <Link
+              href="/grants"
+              className="inline-flex items-center justify-center rounded-full border border-blue-100 bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            >
+              Search Grants
+            </Link>
           </div>
-        </footer>
-      </body>
-    </html>
-  );
+
+          <Menu items={menuItems} className="justify-start" />
+        </div>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-1">{children}</main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white py-8 text-sm text-slate-600">
+        <div className="container-grid flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p>
+              &copy; {new Date().getFullYear()} {siteName}. All rights reserved.
+            </p>
+            <p className="text-xs text-slate-500">
+              Built to simplify access to public funding.
+            </p>
+          </div>
+          <nav className="flex flex-wrap items-center gap-4">
+            <Link href="/about" className="hover:text-slate-900">
+              About
+            </Link>
+            <Link href="/resources" className="hover:text-slate-900">
+              Resources
+            </Link>
+            <Link href="/privacy" className="hover:text-slate-900">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-900">
+              Terms
+            </Link>
+            <Link href="/contact" className="hover:text-slate-900">
+              Contact
+            </Link>
+          </nav>
+        </div>
+      </footer>
+    </body>
+  </html>
+);
+
 }

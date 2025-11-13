@@ -1,5 +1,4 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import { validate as isUuid } from "uuid";
 import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
@@ -358,6 +357,13 @@ export function filterGrantsLocally(
     pageSize,
     totalPages: filtered.length > 0 ? Math.ceil(filtered.length / pageSize) : 0,
   };
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
 }
 
 /** Normalize UUID or fallback to short ID */

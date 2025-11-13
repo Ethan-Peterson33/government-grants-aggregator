@@ -192,7 +192,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
         )}
                 {randomCategory && (
             <Link
-              href={`/grants?category=${slugify(randomCategory.value)}`}
+              href={`/grants/category/${slugify(randomCategory.value)}`}
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               {randomCategory.label} programs
@@ -273,7 +273,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
                    {randomCategory && (
                     <li key={randomCategory.value}>
                       <Link
-                        href={`/grants?category=${slugify(randomCategory.value)}`}
+                        href={`/grants/category/${slugify(randomCategory.value)}`}
                         className="text-blue-700 hover:text-blue-900"
                       >
                         {randomCategory.label} grants

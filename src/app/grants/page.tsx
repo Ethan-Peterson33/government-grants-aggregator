@@ -95,17 +95,10 @@ export default async function GrantsIndexPage({
   const [searchResult, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
   const { grants, total, totalPages } = searchResult;
 
- const categoryOptions: FilterOption[] = pickRandom(
-  facets.categories.map((value) => ({ label: value, value })),
-  3 // choose however many you want to show
-);
-
-const stateOptions: FilterOption[] = pickRandom(
-  facets.states.map((value) => ({ label: value, value })),
-  3
-);
-
-  const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
+// ✅ for the dropdowns
+const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
+const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
+const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },

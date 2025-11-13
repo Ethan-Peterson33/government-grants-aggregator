@@ -14,13 +14,12 @@ import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
 type TableFeatures = {
-  hasGrantCategoryFk?: boolean;
   hasStateColumn?: boolean;
   hasCityColumn?: boolean;
 };
 
 const TABLE_FEATURES: Record<string, TableFeatures> = {
-  grants: { hasGrantCategoryFk: true, hasStateColumn: true, hasCityColumn: true },
+  grants: { hasStateColumn: true, hasCityColumn: true },
 };
 
 /** Safely parse numeric query params */
@@ -55,9 +54,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const sanitizedQuery = like(filters.query);
   const sanitizedCategory = like(filters.category);
 
-  // 🔹 Raw state string from filters (for “Federal (nationwide)” detection)
   const rawStateFilter = typeof filters.state === "string" ? filters.state.trim() : "";
-
   const sanitizedState = like(filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
@@ -73,14 +70,12 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
-  // Detect when user chose the special “Federal” option in the UI
   const stateLower = rawStateFilter.toLowerCase();
   const isFederalStateFilter =
     stateLower === "federal" ||
     stateLower === "federal (nationwide)" ||
     stateLower === "nationwide";
 
-  // If jurisdiction wasn't explicitly passed, derive it from the state filter
   let jurisdiction = filters.jurisdiction ?? undefined;
   if (!jurisdiction && isFederalStateFilter) {
     jurisdiction = "federal";
@@ -103,23 +98,12 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   });
 
   for (const table of TABLE_FALLBACK_ORDER) {
-    const { hasGrantCategoryFk = false, hasStateColumn = false, hasCityColumn = false } = TABLE_FEATURES[table] ?? {};
+    const { hasStateColumn = false, hasCityColumn = false } = TABLE_FEATURES[table] ?? {};
 
-    const selectColumns = hasGrantCategoryFk
-      ? `
-        *,
-        grant_categories:grant_categories(
-          category_code,
-          category_label,
-          slug
-        )
-        `
-      : "*";
-
-    // ✅ JOIN category table via FK
+    // 🧩 Base query
     let q = supabase
       .from(table)
-      .select(selectColumns, { count: "exact" })
+      .select("*", { count: "exact" })
       .order("scraped_at", { ascending: false })
       .range(from, to);
 
@@ -132,16 +116,28 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.or(queryOrClauses.join(","));
     }
 
-    /** Category filter (join-based) */
+    /** Category filter (safe subquery approach) */
     if (sanitizedCategory) {
       const trimmedCategory = sanitizedCategory.trim();
       const pattern = `%${trimmedCategory}%`;
 
-      if (hasGrantCategoryFk) {
-        // ✅ Match by label only — safer and avoids logic tree parse errors
-        q = q.ilike("grant_categories.category_label", pattern);
+      console.log("🏷️ Looking up matching categories:", pattern);
+      const { data: matchingCategories, error: catErr } = await supabase
+        .from("grant_categories")
+        .select("category_code")
+        .ilike("category_label", pattern);
+
+      if (catErr) {
+        console.error("❌ Category lookup failed:", catErr);
+      }
+
+      const matchingCodes = matchingCategories?.map((c) => c.category_code) ?? [];
+      console.log("📊 Matching category codes:", matchingCodes);
+
+      if (matchingCodes.length > 0) {
+        q = q.in("category_code", matchingCodes);
       } else {
-        q = q.ilike("category", pattern);
+        q = q.eq("category_code", "__none__"); // ensures empty result set
       }
     }
 
@@ -166,21 +162,18 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.ilike("city", `%${sanitizedCity}%`);
     }
 
-    /** ✅ Combined Agency Filters */
+    /** Agency filters */
     const agencyClauses: string[] = [];
-
     if (sanitizedAgency) {
       agencyClauses.push(`agency.ilike.%${escapeIlike(sanitizedAgency)}%`);
       agencyClauses.push(`agency_name.ilike.%${escapeIlike(sanitizedAgency)}%`);
     }
-
     if (sanitizedAgencyCode) {
       const codeCandidates = agencySlugCandidates(sanitizedAgencyCode);
       for (const code of codeCandidates.codeCandidates) {
         agencyClauses.push(`agency_code.ilike.%${escapeIlike(code)}%`);
       }
     }
-
     if (sanitizedAgencySlug) {
       const slugCandidates = agencySlugCandidates(sanitizedAgencySlug);
       for (const code of slugCandidates.codeCandidates) {
@@ -192,7 +185,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         agencyClauses.push(`agency.ilike.%${fragment}%`);
       }
     }
-
     if (agencyClauses.length > 0) {
       console.log("🏢 Matching all agency conditions", agencyClauses);
       q = q.or(agencyClauses.join(","), { foreignTable: undefined });
@@ -229,7 +221,17 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       }
     }
 
-    /** Execute Query */
+    console.log("🧩 Supabase query composition snapshot:", {
+      sanitizedCategory,
+      sanitizedState,
+      sanitizedAgency,
+      sanitizedCity,
+      jurisdiction,
+      page,
+      range: { from, to },
+      queryObject: q,
+    });
+
     const { data, error, count } = (await q) as unknown as {
       data: Grant[] | null;
       error: PostgrestError | null;
@@ -244,12 +246,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     /** Transform Results */
     const grants = (data ?? []).map((grant) => {
       const agencyName = grant.agency_name ?? grant.agency ?? null;
-      const categoryLabel =
-        grant.grant_categories?.category_label ??
-        grant.category ??
-        grant.category_code ??
-        null;
-
       const fallbackSlug = deriveAgencySlug({
         slug: grant.agency_slug ?? undefined,
         agency_code: grant.agency_code ?? undefined,
@@ -262,8 +258,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         agency: agencyName,
         agency_name: agencyName,
         agency_slug: fallbackSlug || null,
-        category: categoryLabel,
-        category_code: grant.category_code ?? null,
       };
     });
 
@@ -288,12 +282,11 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   return { grants: [], total: 0, page, pageSize, totalPages: 0 };
 }
 
-/** Helper utilities */
+/** Local filtering helpers (unchanged) */
 const toComparable = (value: string | null | undefined) => value?.trim().toLowerCase() ?? "";
 const textIncludes = (text: string | null | undefined, keyword: string) =>
   toComparable(text).includes(keyword);
 
-/** Local filtering (fallback) */
 export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolean {
   const keyword = toComparable(filters.query);
   if (keyword) {
@@ -330,7 +323,6 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   return true;
 }
 
-/** Local filtering + pagination */
 export function filterGrantsLocally(
   grants: Grant[],
   filters: GrantFilters = {},
@@ -358,80 +350,6 @@ export function filterGrantsLocally(
     totalPages: filtered.length > 0 ? Math.ceil(filtered.length / pageSize) : 0,
   };
 }
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function isUuid(value: string): boolean {
-  return UUID_PATTERN.test(value);
-}
-
-/** Normalize UUID or fallback to short ID */
-function normalizeGrantId(rawId: string): string | null {
-  if (!rawId) return null;
-  const cleaned = rawId.replace(/-\d+$/, "");
-  return isUuid(cleaned) ? cleaned : null;
-}
-
-/** Get a single grant by ID, with UUID safety and short-ID fallback */
-export async function getGrantById(id: string): Promise<Grant | null> {
-  const supabase = createServerSupabaseClient();
-  if (!supabase) return null;
-
-  const normalizedId = normalizeGrantId(id);
-  if (!normalizedId) {
-    console.warn("⚠️ Invalid UUID format passed to getGrantById:", id);
-    return null;
-  }
-
-  for (const table of TABLE_FALLBACK_ORDER) {
-    const { data, error } = (await supabase
-      .from(table)
-      .select("*")
-      .eq("id", normalizedId)
-      .maybeSingle()) as unknown as {
-      data: Grant | null;
-      error: PostgrestError | null;
-    };
-
-    if (error) {
-      console.error("❌ getGrantById error:", error);
-      if (error.code === "22P02" || error.message?.includes("invalid input syntax for type uuid")) {
-        console.log("🔁 Falling back to short-ID lookup");
-        return await getGrantByShortId(id.split("-")[0]);
-      }
-      break;
-    }
-
-    if (data) return data;
-  }
-
-  return await getGrantByShortId(id.split("-")[0]);
-}
-
-/** Get grant by short ID prefix */
-export async function getGrantByShortId(short: string): Promise<Grant | null> {
-  const supabase = createServerSupabaseClient();
-  if (!supabase) return null;
-
-  const target = short.trim().toLowerCase();
-  if (!target) return null;
-
-  const { data, error } = await supabase
-    .from("grants")
-    .select("*")
-    .ilike("id", `${target}%`)
-    .order("scraped_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("❌ getGrantByShortId error:", error);
-    return null;
-  }
-  return data ?? null;
-}
-
 /** Faceted data for filters */
 export async function getFacetSets(): Promise<FacetSets> {
   const supabase = createServerSupabaseClient();
@@ -441,29 +359,29 @@ export async function getFacetSets(): Promise<FacetSets> {
   const clean = (vals: (string | null)[]) =>
     [...new Set(vals.filter((v): v is string => !!v && v.trim().length > 0))].sort();
 
-  for (const table of TABLE_FALLBACK_ORDER) {
-    const [cat, st, ag] = (await Promise.all([
-      supabase.from(table).select("category").limit(500),
-      supabase.from(table).select("state").limit(200),
-      supabase.from(table).select("agency").limit(500),
-    ])) as any;
+  try {
+    const [cat, st, ag] = await Promise.all([
+      supabase.from("grant_categories").select("category_label").limit(500),
+      supabase.from("grants").select("state").limit(200),
+      supabase.from("grants").select("agency").limit(500),
+    ]);
 
     if (cat.error || st.error || ag.error) {
       console.error("❌ facet query failed", cat.error || st.error || ag.error);
-      continue;
+      return f;
     }
 
-    f.categories = clean(cat.data.map((x: any) => x.category)).slice(0, 50);
+    f.categories = clean(cat.data.map((x: any) => x.category_label)).slice(0, 50);
 
     const dbStates = clean(st.data.map((x: any) => x.state)).slice(0, 60);
-
     const hasFederalAlready = dbStates.some((s) =>
       s.toLowerCase().includes("federal") || s.toLowerCase().includes("nationwide")
     );
 
     f.states = hasFederalAlready ? dbStates : ["Federal (nationwide)", ...dbStates];
     f.agencies = clean(ag.data.map((x: any) => x.agency)).slice(0, 50);
-    break;
+  } catch (err) {
+    console.error("❌ Error loading facets:", err);
   }
 
   if (f.states.length === 0) {

@@ -7,6 +7,7 @@ import { RelatedLinks } from "@/components/grants/related-links";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 import { slugify } from "@/lib/strings";
+import { pickRandom } from "@/lib/utils";
 
 const PAGE_SIZE = 12;
 
@@ -94,8 +95,16 @@ export default async function GrantsIndexPage({
   const [searchResult, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
   const { grants, total, totalPages } = searchResult;
 
-  const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
-  const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
+ const categoryOptions: FilterOption[] = pickRandom(
+  facets.categories.map((value) => ({ label: value, value })),
+  3 // choose however many you want to show
+);
+
+const stateOptions: FilterOption[] = pickRandom(
+  facets.states.map((value) => ({ label: value, value })),
+  3
+);
+
   const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
 
   const breadcrumbItems = [
@@ -189,7 +198,7 @@ export default async function GrantsIndexPage({
             )}
             {categoryOptions[0] && (
               <Link
-                href={`/grants?category=${encodeURIComponent(categoryOptions[0].value)}`}
+                href={`/grants/category/${slugify(categoryOptions[0].value)}`}
                 className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
               >
                 {categoryOptions[0].label} programs

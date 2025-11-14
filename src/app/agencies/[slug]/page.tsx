@@ -157,7 +157,10 @@ const agency = await resolveAgency(slugParam, "agency.page");
     getFacetSets(),
   ]);
 
-  const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
+  const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
+    label: `${item.label} (${item.grantCount})`,
+    value: item.slug,
+  }));
   const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
   const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
 

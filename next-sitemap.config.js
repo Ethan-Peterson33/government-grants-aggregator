@@ -37,7 +37,16 @@ module.exports = {
     console.log('[next-sitemap] grantPaths count:', grantPaths.length);
     console.log('[next-sitemap] agencyPaths count:', agencyPaths.length);
 
+    const staticPages = [
+      {
+        loc: '/faq',
+        changefreq: 'weekly',
+        priority: 0.6,
+      },
+    ];
+
     const extraUrls = [
+      ...staticPages,
       ...grantPaths.map((loc) => ({
         loc,
         changefreq: 'daily',

@@ -11,7 +11,8 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/grants", label: "Find Grants" },
+  { href: "/grants", label: "Search Grants" },
+  { href: "/agencies", label: "Agencies" },
   { href: "/resources", label: "Resources", isButton: true },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },

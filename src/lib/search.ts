@@ -8,6 +8,7 @@ import {
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
 import { deriveAgencySlug } from "@/lib/slug";
+import { slugify } from "@/lib/strings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
 
@@ -52,7 +53,9 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     typeof v === "string" && v.trim() ? escapeIlike(v.trim()) : undefined;
 
   const sanitizedQuery = like(filters.query);
-  const sanitizedCategory = like(filters.category);
+  const rawCategoryFilter =
+    typeof filters.category === "string" ? filters.category.trim() : "";
+  const slugCandidate = rawCategoryFilter ? slugify(rawCategoryFilter) : "";
 
   const rawStateFilter = typeof filters.state === "string" ? filters.state.trim() : "";
   const sanitizedState = like(filters.state);
@@ -81,9 +84,55 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     jurisdiction = "federal";
   }
 
+  let categoryCodes: string[] = [];
+  const shouldFilterByCategory = rawCategoryFilter.length > 0;
+
+  if (shouldFilterByCategory) {
+    const slugFilters = Array.from(
+      new Set(
+        [slugCandidate, rawCategoryFilter.toLowerCase()]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0),
+      ),
+    );
+
+    if (slugFilters.length > 0) {
+      const { data: slugMatches, error: slugError } = await supabase
+        .from("grant_categories")
+        .select("category_code")
+        .in("slug", slugFilters)
+        .limit(25);
+
+      if (slugError) {
+        console.error("❌ Category slug lookup failed:", slugError);
+      } else {
+        categoryCodes = (slugMatches ?? [])
+          .map((entry) => entry?.category_code)
+          .filter((code): code is string => typeof code === "string" && code.trim().length > 0);
+      }
+    }
+
+    if (categoryCodes.length === 0) {
+      const pattern = `%${escapeIlike(rawCategoryFilter)}%`;
+      console.log("🏷️ Falling back to label match for category filter:", pattern);
+      const { data: matchingCategories, error: catErr } = await supabase
+        .from("grant_categories")
+        .select("category_code")
+        .ilike("category_label", pattern);
+
+      if (catErr) {
+        console.error("❌ Category label lookup failed:", catErr);
+      } else {
+        categoryCodes = (matchingCategories ?? [])
+          .map((c) => c?.category_code)
+          .filter((code): code is string => typeof code === "string" && code.trim().length > 0);
+      }
+    }
+  }
+
   console.log("➡️ Final grant query filters", {
     sanitizedQuery,
-    sanitizedCategory,
+    categoryFilter: rawCategoryFilter,
     sanitizedState,
     sanitizedCity,
     sanitizedAgency,
@@ -95,6 +144,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     page,
     pageSize,
     range: { from, to },
+    categoryCodes,
   });
 
   for (const table of TABLE_FALLBACK_ORDER) {
@@ -116,28 +166,14 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.or(queryOrClauses.join(","));
     }
 
-    /** Category filter (safe subquery approach) */
-    if (sanitizedCategory) {
-      const trimmedCategory = sanitizedCategory.trim();
-      const pattern = `%${trimmedCategory}%`;
-
-      console.log("🏷️ Looking up matching categories:", pattern);
-      const { data: matchingCategories, error: catErr } = await supabase
-        .from("grant_categories")
-        .select("category_code")
-        .ilike("category_label", pattern);
-
-      if (catErr) {
-        console.error("❌ Category lookup failed:", catErr);
-      }
-
-      const matchingCodes = matchingCategories?.map((c) => c.category_code) ?? [];
-      console.log("📊 Matching category codes:", matchingCodes);
-
-      if (matchingCodes.length > 0) {
-        q = q.in("category_code", matchingCodes);
+    /** Category filter */
+    if (shouldFilterByCategory) {
+      if (categoryCodes.length > 0) {
+        console.log("📊 Applying category codes filter", categoryCodes);
+        q = q.in("category_code", categoryCodes);
       } else {
-        q = q.eq("category_code", "__none__"); // ensures empty result set
+        console.log("🚫 No matching category codes found for", rawCategoryFilter);
+        q = q.eq("category_code", "__none__");
       }
     }
 
@@ -222,7 +258,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     }
 
     console.log("🧩 Supabase query composition snapshot:", {
-      sanitizedCategory,
+      categoryFilter: rawCategoryFilter,
       sanitizedState,
       sanitizedAgency,
       sanitizedCity,
@@ -361,17 +397,42 @@ export async function getFacetSets(): Promise<FacetSets> {
 
   try {
     const [cat, st, ag] = await Promise.all([
-      supabase.from("grant_categories").select("category_label").limit(500),
+      supabase.rpc("categories_with_counts"),
       supabase.from("grants").select("state").limit(200),
       supabase.from("grants").select("agency").limit(500),
     ]);
 
-    if (cat.error || st.error || ag.error) {
-      console.error("❌ facet query failed", cat.error || st.error || ag.error);
-      return f;
+    const { data: categoryData, error: categoryError } = cat as unknown as {
+      data: { slug: string | null; category_label: string | null; grant_count: number | null }[] | null;
+      error: PostgrestError | null;
+    };
+
+    if (categoryError) {
+      console.warn("⚠️ categories_with_counts RPC failed", categoryError);
+    } else if (Array.isArray(categoryData)) {
+      f.categories = categoryData
+        .filter(
+          (item): item is { slug: string; category_label: string; grant_count: number } =>
+            typeof item?.slug === "string" &&
+            item.slug.trim().length > 0 &&
+            typeof item?.category_label === "string" &&
+            item.category_label.trim().length > 0 &&
+            typeof item?.grant_count === "number" &&
+            item.grant_count > 0,
+        )
+        .map((item) => ({
+          slug: item.slug.trim(),
+          label: item.category_label.trim(),
+          grantCount: item.grant_count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+        .slice(0, 100);
     }
 
-    f.categories = clean(cat.data.map((x: any) => x.category_label)).slice(0, 50);
+    if (st.error || ag.error) {
+      console.error("❌ facet query failed", st.error || ag.error);
+      return f;
+    }
 
     const dbStates = clean(st.data.map((x: any) => x.state)).slice(0, 60);
     const hasFederalAlready = dbStates.some((s) =>

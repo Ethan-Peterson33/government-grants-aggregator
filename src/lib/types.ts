@@ -49,8 +49,14 @@ export type GrantFilters = {
   pageSize?: number;
 };
 
+export type CategoryFacet = {
+  slug: string;
+  label: string;
+  grantCount: number;
+};
+
 export type FacetSets = {
-  categories: string[];
+  categories: CategoryFacet[];
   states: string[];
   agencies: string[];
 };

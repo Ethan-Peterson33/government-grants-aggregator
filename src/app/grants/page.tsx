@@ -96,7 +96,11 @@ export default async function GrantsIndexPage({
   const { grants, total, totalPages } = searchResult;
 
 // ✅ for the dropdowns
-const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
+const categoriesWithCounts = facets.categories;
+const categoryOptions: FilterOption[] = categoriesWithCounts.map((item) => ({
+  label: `${item.label} (${item.grantCount})`,
+  value: item.slug,
+}));
 const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
 const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
 
@@ -107,21 +111,14 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
 
   const itemListJsonLd = generateItemListJsonLd(grants);
 const [randomState] = pickRandom(stateOptions, 1);
-const [randomCategory] = pickRandom(categoryOptions, 1);
+const [randomCategory] = pickRandom(categoriesWithCounts, 1);
+  const primaryCategory = categoriesWithCounts[0];
   const relatedLinks = [
-    categoryOptions[0] && categoryOptions[0].value !== category
-      ? (() => {
-          const slug = slugify(categoryOptions[0].value);
-          return slug
-            ? {
-                label: `${categoryOptions[0].label} grants`,
-                href: `/grants/category/${slug}`,
-              }
-            : {
-                label: `${categoryOptions[0].label} grants`,
-                href: `/grants?category=${slugify(categoryOptions[0].value)}`,
-              };
-        })()
+    primaryCategory && primaryCategory.slug !== category
+      ? {
+          label: `${primaryCategory.label} grants`,
+          href: `/grants/category/${primaryCategory.slug}`,
+        }
       : null,
     stateOptions[0] && stateOptions[0].value !== state
       ? {
@@ -192,7 +189,7 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
         )}
                 {randomCategory && (
             <Link
-              href={`/grants/category/${slugify(randomCategory.value)}`}
+              href={`/grants/category/${randomCategory.slug}`}
               className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
             >
               {randomCategory.label} programs
@@ -271,9 +268,9 @@ const [randomCategory] = pickRandom(categoryOptions, 1);
               </h2>
               <ul className="space-y-1 text-sm">
                    {randomCategory && (
-                    <li key={randomCategory.value}>
+                    <li key={randomCategory.slug}>
                       <Link
-                        href={`/grants/category/${slugify(randomCategory.value)}`}
+                        href={`/grants/category/${randomCategory.slug}`}
                         className="text-blue-700 hover:text-blue-900"
                       >
                         {randomCategory.label} grants

@@ -301,6 +301,11 @@ export function inferGrantLocation(
     return { jurisdiction: "private" };
   }
 
+  const normalizedState = slugify(typeof grant.state === "string" ? grant.state : "");
+  if (normalizedState.includes("private")) {
+    return { jurisdiction: "private" };
+  }
+
   if (isFederalStateValue(grant.state)) {
     return { jurisdiction: "federal" };
   }

@@ -157,7 +157,7 @@ export function GrantsSearchClient({
       const stateQueryValue = resolveStateQueryValue(params?.get("state") ?? undefined).value;
 
       const filters = normalizeFilters({
-        query: params?.get("keyword") ?? "",
+        query: params?.get("keyword") ?? params?.get("query") ?? "",
         category: params?.get("category") ?? "",
         state: stateQueryValue ?? "",
         agency: params?.get("agency") ?? "",

@@ -153,6 +153,24 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   for (const table of TABLE_FALLBACK_ORDER) {
     const { hasStateColumn = false, hasCityColumn = false } = TABLE_FEATURES[table] ?? {};
 
+    const stateClauses: string[] = [];
+
+    if (stateCode && hasStateColumn) {
+      const candidates = new Set<string>([stateCode, ...stateNameCandidatesFromCode(stateCode)]);
+      for (const candidate of candidates) {
+        const sanitized = escapeIlike(candidate);
+        stateClauses.push(`state.ilike.%${sanitized}%`);
+      }
+    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
+      stateClauses.push(`state.ilike.%${sanitizedState}%`);
+    }
+
+    const applyStateClauses = () => {
+      if (stateClauses.length === 0) return;
+      console.log("🌎 Matching state code candidates", { table, stateCode, clauses: stateClauses });
+      q = q.or(stateClauses.join(","));
+    };
+
     // 🧩 Base query
     let q = supabase
       .from(table)
@@ -178,21 +196,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         console.log("🚫 No matching category codes found for", rawCategoryFilter);
         q = q.eq("category_code", "__none__");
       }
-    }
-
-    /** State filter */
-    if (stateCode && hasStateColumn) {
-      const candidates = new Set<string>([stateCode, ...stateNameCandidatesFromCode(stateCode)]);
-      const clauses = Array.from(candidates).map((candidate) => {
-        const sanitized = escapeIlike(candidate);
-        return `state.ilike.%${sanitized}%`;
-      });
-
-      console.log("🌎 Matching state code candidates", { table, stateCode, clauses });
-      q = q.or(clauses.join(","));
-    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
-      console.log("🌎 Matching state fragment", { table, state: sanitizedState });
-      q = q.ilike("state", `%${sanitizedState}%`);
     }
 
     /** City filter */
@@ -255,6 +258,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
         q = q.or(orClauses.join(","));
       }
+      applyStateClauses();
     } else if (jurisdiction === "state" && hasCityColumn) {
       if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
         q = q.eq("jurisdiction", "state");
@@ -265,21 +269,33 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         statewideCityClauses.push(`city.ilike.%${escapeIlike(label)}%`);
       }
 
+      const combinedClauses = stateClauses.length
+        ? stateClauses.flatMap((stateClause) =>
+            statewideCityClauses.map((cityClause) => `and(${stateClause},${cityClause})`)
+          )
+        : statewideCityClauses;
+
       console.log("🗺️ Applying state jurisdiction filter (statewide + unspecified cities)", {
         table,
-        clauses: statewideCityClauses,
+        clauses: combinedClauses,
       });
-      q = q.or(statewideCityClauses.join(","));
+
+      if (combinedClauses.length > 0) {
+        q = q.or(combinedClauses.join(","));
+      }
     } else if (jurisdiction === "local" && hasCityColumn) {
       if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
         q = q.eq("jurisdiction", "local");
       }
 
       console.log("🏘️ Applying local jurisdiction filter", { table });
+      applyStateClauses();
       q = q.not("city", "is", null).not("city", "eq", "");
       for (const label of STATEWIDE_CITY_LABELS) {
         q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
       }
+    } else {
+      applyStateClauses();
     }
 
     console.log("🧩 Supabase query composition snapshot:", {

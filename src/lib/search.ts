@@ -395,7 +395,7 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   }
 
   if (filterStateCode) {
-    if (location.jurisdiction === "federal") return false;
+    if (location.jurisdiction === "federal" || location.jurisdiction === "private") return false;
     if (location.stateCode.toUpperCase() !== filterStateCode) return false;
   }
 

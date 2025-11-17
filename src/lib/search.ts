@@ -19,10 +19,11 @@ const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 type TableFeatures = {
   hasStateColumn?: boolean;
   hasCityColumn?: boolean;
+  hasJurisdictionColumn?: boolean;
 };
 
 const TABLE_FEATURES: Record<string, TableFeatures> = {
-  grants: { hasStateColumn: true, hasCityColumn: true },
+  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: true },
 };
 
 /** Safely parse numeric query params */
@@ -235,16 +236,30 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     }
 
     /** Jurisdiction filters */
-    if (jurisdiction === "federal" && hasStateColumn) {
+    if (jurisdiction === "federal") {
+      const orClauses: string[] = [];
 
-      const orClauses = ["state.is.null", "state.eq.''"];
-      for (const label of FEDERAL_STATE_LABELS) {
-        const sanitizedLabel = escapeIlike(label);
-        orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+      if (hasStateColumn) {
+        orClauses.push("state.is.null", "state.eq.''");
+        for (const label of FEDERAL_STATE_LABELS) {
+          const sanitizedLabel = escapeIlike(label);
+          orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+        }
       }
-      console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
-      q = q.or(orClauses.join(","));
+
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        orClauses.push("jurisdiction.eq.federal", "jurisdiction.ilike.federal");
+      }
+
+      if (orClauses.length > 0) {
+        console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
+        q = q.or(orClauses.join(","));
+      }
     } else if (jurisdiction === "state" && hasCityColumn) {
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        q = q.eq("jurisdiction", "state");
+      }
+
       const statewideCityClauses = ["city.is.null", "city.eq.''"];
       for (const label of STATEWIDE_CITY_LABELS) {
         statewideCityClauses.push(`city.ilike.%${escapeIlike(label)}%`);
@@ -256,6 +271,10 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       });
       q = q.or(statewideCityClauses.join(","));
     } else if (jurisdiction === "local" && hasCityColumn) {
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        q = q.eq("jurisdiction", "local");
+      }
+
       console.log("🏘️ Applying local jurisdiction filter", { table });
       q = q.not("city", "is", null).not("city", "eq", "");
       for (const label of STATEWIDE_CITY_LABELS) {

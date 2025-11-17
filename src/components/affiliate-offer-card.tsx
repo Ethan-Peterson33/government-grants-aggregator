@@ -45,21 +45,24 @@ const offers: AffiliateOffer[] = [
   
 ];
 
-// Choose the best affiliate offer based on the category/agency
 function pickOffer(category?: string, agency?: string): AffiliateOffer {
   const lc = (category || "").toLowerCase();
-  if (lc.includes("business")) return offers[2];
+
+  // SAFELY return Fiverr offer when other offers don't exist
+  if (lc.includes("business")) return offers[0];
   if (lc.includes("education") || lc.includes("university")) return offers[0];
-  if (lc.includes("nonprofit") || lc.includes("organization")) return offers[1];
-  return offers[0];
+  if (lc.includes("nonprofit") || lc.includes("organization")) return offers[0];
+
+  return offers[0]; // always fall back safely
 }
+
 
 export function AffiliateOfferCard({ category, agency }: Props) {
   const offer = pickOffer(category, agency);
-
+    const color = offer?.color ?? "slate";
   return (
     <section
-      className={`mt-8 rounded-lg border border-${offer.color}-200 bg-${offer.color}-50 p-5 shadow-sm`}
+     className={`mt-8 rounded-lg border border-${color}-200 bg-${color}-50 p-5 shadow-sm`}
     >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600 mb-2">
         Recommended Resource

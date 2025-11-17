@@ -96,12 +96,21 @@ export default async function GrantsIndexPage({
   const { grants, total, totalPages } = searchResult;
 
 // ✅ for the dropdowns
+<<<<<<< HEAD
 const categoriesWithCounts = facets.categories;
 const categoryOptions: FilterOption[] = categoriesWithCounts.map((item) => ({
   label: `${item.label} (${item.grantCount})`,
   value: item.slug,
 }));
 const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
+=======
+const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
+const stateOptions: FilterOption[] = facets.states.map((value) => ({
+  label: value.length === 2 ? value : value, // leave as-is
+  value: value, // no slugify, raw value
+}));
+
+>>>>>>> dff3295 (updating state page path and filters)
 const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
 
   const breadcrumbItems = [

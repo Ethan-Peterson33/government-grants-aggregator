@@ -16,20 +16,30 @@ function formatCategory(value: string | undefined): string | undefined {
   return wordsFromSlug(value.toLowerCase().replace(/\s+/g, "-"));
 }
 
+/** -------------------------------------------
+ *  FIXED generateMetadata — unwrap params/searchParams
+ * ------------------------------------------ */
 export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: { stateCode: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ stateCode: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
+  const resolvedParams = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
+
+  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+
+  const rawCategory =
+    typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
+
   const category = formatCategory(rawCategory);
 
   const title = category
     ? `${category} Grants in ${stateInfo.name}`
     : `${stateInfo.name} Statewide Grants`;
+
   const description = category
     ? `Explore ${category.toLowerCase()} funding available to organizations across ${stateInfo.name}.`
     : `Discover statewide grant programs supporting communities throughout ${stateInfo.name}.`;
@@ -37,22 +47,35 @@ export async function generateMetadata({
   return { title, description };
 }
 
+/** -------------------------------------------
+ *  FIXED default export — unwrap params/searchParams
+ * ------------------------------------------ */
 export default async function StateGrantsPage({
   params,
   searchParams,
 }: {
-  params: { stateCode: string };
-  searchParams?: Record<string, string | string[] | undefined>;
+  params: Promise<{ stateCode: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const stateInfo = resolveStateParam(params.stateCode);
-  const page = safeNumber(searchParams?.page, 1);
-  const pageSize = Math.min(50, safeNumber(searchParams?.pageSize, PAGE_SIZE));
-  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
+  const resolvedParams = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
+
+  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+
+  const page = safeNumber(resolvedSearch?.page, 1);
+  const pageSize = Math.min(50, safeNumber(resolvedSearch?.pageSize, PAGE_SIZE));
+
+  const rawCategory =
+    typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
+
   const category = formatCategory(rawCategory);
 
+  /** -------------------------------------------
+   *  FIX: Always pass stateCode (postal code) to searchGrants
+   * ------------------------------------------ */
   const { grants, total } = await searchGrants({
-    stateCode: stateInfo.code,
-    state: stateInfo.name,
+    stateCode: stateInfo.code, // ⬅️ VA, TX, CA…
+    state: stateInfo.name,     // ⬅️ "Virginia" (fallback local match)
     category,
     jurisdiction: "state",
     page,
@@ -70,25 +93,31 @@ export default async function StateGrantsPage({
 
   const relatedLinks = [
     { label: "Federal programs", href: "/grants/federal" },
-    { label: `Search all ${stateInfo.code} funding`, href: `/grants?state=${encodeURIComponent(stateInfo.code)}` },
+    {
+      label: `Search all ${stateInfo.code} funding`,
+      href: `/grants?state=${encodeURIComponent(stateInfo.code)}`
+    },
     category
       ? {
           label: `More ${category.toLowerCase()} grants`,
           href: `/grants/state/${stateInfo.code}?category=${encodeURIComponent(category)}`,
         }
       : null,
-  ].filter((link): link is { label: string; href: string } => Boolean(link));
+  ].filter(Boolean) as { label: string; href: string }[];
 
   return (
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
+
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold text-slate-900">
-          {category ? `${category} grants in ${stateInfo.name}` : `${stateInfo.name} statewide grants`}
+          {category
+            ? `${category} grants in ${stateInfo.name}`
+            : `${stateInfo.name} statewide grants`}
         </h1>
         <p className="text-slate-600">
-          Review active funding initiatives supporting communities across {stateInfo.name}. Filter by category to focus on
-          programs that align with your mission.
+          Review active funding initiatives supporting communities across {stateInfo.name}.
+          Filter by category to focus on programs that align with your mission.
         </p>
       </header>
 
@@ -102,6 +131,7 @@ export default async function StateGrantsPage({
             </div>
           )}
         </div>
+
         {hasResults && (
           <Pagination
             total={total}
@@ -120,7 +150,12 @@ export default async function StateGrantsPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+            generateBreadcrumbJsonLd(
+              breadcrumbItems.map((item) => ({
+                name: item.label,
+                url: item.href,
+              }))
+            ),
             itemListJsonLd,
           ]),
         }}

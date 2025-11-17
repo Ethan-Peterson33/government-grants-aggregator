@@ -234,7 +234,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     /** Jurisdiction filters */
     if (jurisdiction === "federal" && hasStateColumn) {
-      const orClauses = ["state.is.null", "state.eq."];
+     
+      const orClauses = ["state.is.null", "state.eq.''"];
       for (const label of FEDERAL_STATE_LABELS) {
         const sanitizedLabel = escapeIlike(label);
         orClauses.push(`state.ilike.%${sanitizedLabel}%`);
@@ -242,13 +243,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
       q = q.or(orClauses.join(","));
     } else if (jurisdiction === "state" && hasCityColumn) {
-      const cityClauses = ["city.is.null"];
-      for (const label of STATEWIDE_CITY_LABELS) {
-        const sanitizedLabel = escapeIlike(label);
-        cityClauses.push(`city.ilike.%${sanitizedLabel}%`);
-      }
-      console.log("🗺️ Applying state jurisdiction filter", { table, clauses: cityClauses });
-      q = q.or(cityClauses.join(","));
+     console.log("🗺️ Applying state jurisdiction filter (no city restriction)", { table });
+     
     } else if (jurisdiction === "local" && hasCityColumn) {
       console.log("🏘️ Applying local jurisdiction filter", { table });
       q = q.not("city", "is", null).not("city", "eq", "");
@@ -392,13 +388,19 @@ export async function getFacetSets(): Promise<FacetSets> {
   if (!supabase) return { categories: [], states: [], agencies: [] };
 
   const f: FacetSets = { categories: [], states: [], agencies: [] };
+
   const clean = (vals: (string | null)[]) =>
     [...new Set(vals.filter((v): v is string => !!v && v.trim().length > 0))].sort();
 
   try {
     const [cat, st, ag] = await Promise.all([
+<<<<<<< HEAD
       supabase.rpc("categories_with_counts"),
       supabase.from("grants").select("state").limit(200),
+=======
+      supabase.from("grant_categories").select("category_label").limit(500),
+      supabase.from("grants").select("state").limit(500),
+>>>>>>> dff3295 (updating state page path and filters)
       supabase.from("grants").select("agency").limit(500),
     ]);
 
@@ -429,28 +431,47 @@ export async function getFacetSets(): Promise<FacetSets> {
         .slice(0, 100);
     }
 
+<<<<<<< HEAD
     if (st.error || ag.error) {
       console.error("❌ facet query failed", st.error || ag.error);
       return f;
     }
+=======
+    // categories (unchanged)
+    f.categories = clean(cat.data.map((x) => x.category_label)).slice(0, 50);
+>>>>>>> dff3295 (updating state page path and filters)
 
-    const dbStates = clean(st.data.map((x: any) => x.state)).slice(0, 60);
-    const hasFederalAlready = dbStates.some((s) =>
-      s.toLowerCase().includes("federal") || s.toLowerCase().includes("nationwide")
+    // states: normalize → dedupe → sort
+    const rawStates = clean(st.data.map((x) => x.state));
+
+    const normalized = rawStates
+      .map((s) => normalizeStateCode(s) ?? s)
+      .map((s) =>
+        typeof s === "string" && s.length === 2 ? s : s.trim()
+      );
+
+    const uniqueStates = [...new Set(normalized)].sort();
+
+    const hasFederal = uniqueStates.some((s) =>
+      s.toLowerCase().includes("federal") ||
+      s.toLowerCase().includes("nationwide")
     );
 
-    f.states = hasFederalAlready ? dbStates : ["Federal (nationwide)", ...dbStates];
+    f.states = hasFederal
+      ? uniqueStates
+      : ["Federal (nationwide)", ...uniqueStates];
+
     f.agencies = clean(ag.data.map((x: any) => x.agency)).slice(0, 50);
+
   } catch (err) {
     console.error("❌ Error loading facets:", err);
   }
 
-  if (f.states.length === 0) {
-    f.states = ["Federal (nationwide)"];
-  }
+  if (f.states.length === 0) f.states = ["Federal (nationwide)"];
 
   return f;
 }
+
 /** Get a single grant by ID, with UUID safety and short-ID fallback */
 export async function getGrantById(id: string): Promise<Grant | null> {
   const supabase = createServerSupabaseClient();

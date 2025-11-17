@@ -32,9 +32,13 @@ function formatCategory(value: string | undefined): string | undefined {
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: MaybePromise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const rawCategory = typeof searchParams?.category === "string" ? searchParams.category : undefined;
+  const sp = await searchParams; // <-- REQUIRED FIX
+
+  const rawCategory =
+    typeof sp?.category === "string" ? sp.category : undefined;
+
   const category = formatCategory(rawCategory);
 
   const baseTitle = category ? `${category} Federal Grants` : "Federal Government Grants";
@@ -51,9 +55,7 @@ export async function generateMetadata({
   return {
     title: baseTitle,
     description: baseDescription,
-    alternates: {
-      canonical,
-    },
+    alternates: { canonical },
     openGraph: {
       url: canonical,
       title: baseTitle,
@@ -72,16 +74,20 @@ export default async function FederalGrantDetailPage({
   searchParams?: MaybePromise<FederalSearchParams>;
 }) {
   const resolvedParams = await resolveRouteParams(params, "federal.page.params");
+  const sp = await searchParams; // <-- REQUIRED FIX
   const slug = typeof resolvedParams?.slug === "string" ? resolvedParams.slug : undefined;
 
-  const grant = await loadGrant(slug, searchParams);
+  const grant = await loadGrant(slug, sp); // <-- Pass resolved searchParams
 
-  if (!grant) {
-    notFound();
-  }
+  if (!grant) notFound();
 
   const canonical = grantPath(grant);
-  const resolvedSearchParams = await resolveSearchParams(searchParams, "federal.page.searchParams");
+
+  const resolvedSearchParams = await resolveSearchParams(
+    sp,
+    "federal.page.searchParams"
+  );
+
   const currentId = extractSearchParam(resolvedSearchParams, "id");
   const currentSlug = slug ?? null;
 
@@ -90,19 +96,11 @@ export default async function FederalGrantDetailPage({
       currentId ? `?id=${encodeURIComponent(currentId)}` : ""
     }`;
 
-    if (currentPath !== canonical) {
-      redirect(canonical);
-    }
-  } else {
-    console.warn("🧭 FederalGrantDetailPage missing slug; skipping canonical redirect", {
-      context: "federal.page",
-    });
+    if (currentPath !== canonical) redirect(canonical);
   }
 
   const location = inferGrantLocation(grant);
-  if (location.jurisdiction !== "federal") {
-    redirect(canonical);
-  }
+  if (location.jurisdiction !== "federal") redirect(canonical);
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -120,7 +118,9 @@ export default async function FederalGrantDetailPage({
       })
     : { grants: [] as Grant[], total: 0, page: 1, pageSize: 6, totalPages: 0 };
 
-  const relatedGrants = (categoryRelated.grants ?? []).filter((g) => g.id !== grant.id).slice(0, 6);
+  const relatedGrants = (categoryRelated.grants ?? [])
+    .filter((g) => g.id !== grant.id)
+    .slice(0, 6);
 
   const relatedLinks = [
     { label: "All federal grants", href: "/grants/federal" },
@@ -130,7 +130,7 @@ export default async function FederalGrantDetailPage({
           href: `/grants/federal?category=${encodeURIComponent(grant.category)}`,
         }
       : null,
-  ].filter((link): link is { label: string; href: string } => Boolean(link));
+  ].filter(Boolean) as { label: string; href: string }[];
 
   const grantJsonLd = generateGrantJsonLd(grant, { path: canonical });
 
@@ -138,17 +138,21 @@ export default async function FederalGrantDetailPage({
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
       <GrantDetail grant={grant} />
-     <AffiliateOfferCard
-                        category={grant.category ?? undefined}
-                        agency={grant.agency ?? undefined}
-                      />
+
+      <AffiliateOfferCard
+        category={grant.category ?? undefined}
+        agency={grant.agency ?? undefined}
+      />
 
       {relatedGrants.length > 0 && (
         <section className="space-y-4">
           <header>
-            <h2 className="text-2xl font-semibold text-slate-900">More federal grants like this</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">
+              More federal grants like this
+            </h2>
             <p className="text-sm text-slate-600">
-              Explore additional programs from federal agencies that align with this opportunity.
+              Explore additional programs from federal agencies that align with
+              this opportunity.
             </p>
           </header>
           <div className="grid gap-4 md:grid-cols-2">
@@ -166,7 +170,9 @@ export default async function FederalGrantDetailPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+            generateBreadcrumbJsonLd(
+              breadcrumbItems.map((x) => ({ name: x.label, url: x.href }))
+            ),
             grantJsonLd,
           ]),
         }}

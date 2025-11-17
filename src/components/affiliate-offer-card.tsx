@@ -57,12 +57,37 @@ function pickOffer(category?: string, agency?: string): AffiliateOffer {
 }
 
 
-export function AffiliateOfferCard({ category, agency }: Props) {
-  const offer = pickOffer(category, agency);
-    const color = offer?.color ?? "slate";
+export function AffiliateOfferCard({ category, agency: _agency }: Props) {
+  const offer = pickOffer(category, _agency);
+
+  const palette = {
+    blue: {
+      border: "border-blue-200",
+      bg: "bg-blue-50",
+      button: "bg-blue-600 hover:bg-blue-700",
+    },
+    green: {
+      border: "border-green-200",
+      bg: "bg-green-50",
+      button: "bg-green-600 hover:bg-green-700",
+    },
+    amber: {
+      border: "border-amber-200",
+      bg: "bg-amber-50",
+      button: "bg-amber-600 hover:bg-amber-700",
+    },
+    slate: {
+      border: "border-slate-200",
+      bg: "bg-slate-50",
+      button: "bg-slate-600 hover:bg-slate-700",
+    },
+  } as const;
+
+  const colorKey = (offer?.color as keyof typeof palette | undefined) ?? "slate";
+  const colors = palette[colorKey] ?? palette.slate;
   return (
     <section
-     className={`mt-8 rounded-lg border border-${color}-200 bg-${color}-50 p-5 shadow-sm`}
+      className={`mt-8 rounded-lg border ${colors.border} ${colors.bg} p-5 shadow-sm`}
     >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600 mb-2">
         Recommended Resource
@@ -73,7 +98,7 @@ export function AffiliateOfferCard({ category, agency }: Props) {
         href={offer.href}
         target="_blank"
         rel="noopener noreferrer"
-        className={`inline-block bg-${offer.color}-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-${offer.color}-700`}
+        className={`inline-block ${colors.button} text-white text-sm font-medium px-4 py-2 rounded-md`}
       >
         {offer.cta}
       </Link>

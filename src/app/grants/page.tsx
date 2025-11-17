@@ -4,6 +4,7 @@ import { Breadcrumb } from "@/components/grants/breadcrumb";
 import type { FilterOption } from "@/components/grants/filters-bar";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { RelatedLinks } from "@/components/grants/related-links";
+import { normalizeStateCode } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 import { slugify } from "@/lib/strings";
@@ -81,6 +82,7 @@ export default async function GrantsIndexPage({
   const state = typeof params?.state === "string" ? params.state : undefined;
   const agency = typeof params?.agency === "string" ? params.agency : undefined;
   const hasApplyLink = params?.has_apply_link === "1";
+  const stateCode = normalizeStateCode(state ?? undefined) ?? undefined;
 
   const filters = {
     page,
@@ -88,6 +90,7 @@ export default async function GrantsIndexPage({
     query,
     category,
     state,
+    stateCode,
     agency,
     hasApplyLink,
   };
@@ -95,23 +98,19 @@ export default async function GrantsIndexPage({
   const [searchResult, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
   const { grants, total, totalPages } = searchResult;
 
-// ✅ for the dropdowns
-<<<<<<< HEAD
-const categoriesWithCounts = facets.categories;
-const categoryOptions: FilterOption[] = categoriesWithCounts.map((item) => ({
-  label: `${item.label} (${item.grantCount})`,
-  value: item.slug,
-}));
-const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
-=======
-const categoryOptions: FilterOption[] = facets.categories.map((value) => ({ label: value, value }));
-const stateOptions: FilterOption[] = facets.states.map((value) => ({
-  label: value.length === 2 ? value : value, // leave as-is
-  value: value, // no slugify, raw value
-}));
-
->>>>>>> dff3295 (updating state page path and filters)
-const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
+  const categoriesWithCounts = facets.categories;
+  const categoryOptions: FilterOption[] = categoriesWithCounts.map((item) => ({
+    label: `${item.label} (${item.grantCount})`,
+    value: item.slug,
+  }));
+  const stateOptions: FilterOption[] = facets.states.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
+  const agencyOptions: FilterOption[] = facets.agencies.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -119,9 +118,11 @@ const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: v
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
-const [randomState] = pickRandom(stateOptions, 1);
-const [randomCategory] = pickRandom(categoriesWithCounts, 1);
+  const [randomState] = pickRandom(facets.states, 1);
+  const [randomCategory] = pickRandom(categoriesWithCounts, 1);
   const primaryCategory = categoriesWithCounts[0];
+  const primaryState = facets.states[0];
+  const primaryAgency = facets.agencies[0];
   const relatedLinks = [
     primaryCategory && primaryCategory.slug !== category
       ? {
@@ -129,23 +130,23 @@ const [randomCategory] = pickRandom(categoriesWithCounts, 1);
           href: `/grants/category/${primaryCategory.slug}`,
         }
       : null,
-    stateOptions[0] && stateOptions[0].value !== state
+    primaryState && primaryState.value !== state
       ? {
-          label: `Funding in ${stateOptions[0].label}`,
-          href: `/grants?state=${slugify(stateOptions[0].value)}`,
+          label: `Funding in ${primaryState.label}`,
+          href: `/grants?state=${slugify(primaryState.value)}`,
         }
       : null,
-    agencyOptions[0] && agencyOptions[0].value !== agency
+    primaryAgency && primaryAgency.value !== agency
       ? (() => {
-          const slug = slugify(agencyOptions[0].value);
+          const slug = slugify(primaryAgency.value);
           return slug
             ? {
-                label: `Programs from ${agencyOptions[0].label}`,
+                label: `Programs from ${primaryAgency.label}`,
                 href: `/agencies/${slug}`,
               }
             : {
-                label: `Programs from ${agencyOptions[0].label}`,
-                href: `/grants?agency=${slugify(agencyOptions[0].value)}`,
+                label: `Programs from ${primaryAgency.label}`,
+                href: `/grants?agency=${slugify(primaryAgency.value)}`,
               };
         })()
       : null,
@@ -158,60 +159,60 @@ const [randomCategory] = pickRandom(categoriesWithCounts, 1);
   ];
 
   return (
-  <div className="container-grid space-y-8 py-10">
-    <Breadcrumb items={breadcrumbItems} />
+    <div className="container-grid space-y-8 py-10">
+      <Breadcrumb items={breadcrumbItems} />
 
-    <section className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] items-start">
-      {/* MAIN COLUMN */}
-      <div className="space-y-8">
-        {/* HERO / INTRO */}
-        <header className="space-y-4 rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-            Find public funding faster
-          </p>
-          <div className="space-y-3">
-            <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-              Search government grants in one place
-            </h1>
-            <p className="text-slate-600 text-sm sm:text-base">
-              Browse federal opportunities and growing coverage of state and local programs.
-              Filter by keyword, agency, or eligibility to find grants that match your nonprofit,
-              small business, or community project.
+      <section className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] items-start">
+        {/* MAIN COLUMN */}
+        <div className="space-y-8">
+          {/* HERO / INTRO */}
+          <header className="space-y-4 rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+              Find public funding faster
             </p>
-          </div>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
+                Search government grants in one place
+              </h1>
+              <p className="text-slate-600 text-sm sm:text-base">
+                Browse federal opportunities and growing coverage of state and local programs.
+                Filter by keyword, agency, or eligibility to find grants that match your nonprofit,
+                small business, or community project.
+              </p>
+            </div>
 
-          {/* QUICK INTERNAL LINKS / CHIPS */}
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <Link
-              href="/grants/federal"
-              className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-medium text-blue-800 hover:bg-blue-100"
-            >
-              Federal grants overview
-            </Link>
+            {/* QUICK INTERNAL LINKS / CHIPS */}
+            <div className="mt-4 flex flex-wrap gap-2 text-sm">
+              <Link
+                href="/grants/federal"
+                className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-medium text-blue-800 hover:bg-blue-100"
+              >
+                Federal grants overview
+              </Link>
               {randomState && (
-          <Link
-            href={`/grants?state=${slugify(randomState.value)}`}
-            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-          >
-            Funding in {randomState.label}
-          </Link>
-        )}
-                {randomCategory && (
-            <Link
-              href={`/grants/category/${randomCategory.slug}`}
-              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-            >
-              {randomCategory.label} programs
-            </Link>
-)}
-           {/* <Link
-              href="/grants?has_apply_link=1"
-              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-            >
-              Grants with apply links
-            </Link>*/}
-          </div>
-        </header>
+                <Link
+                  href={`/grants?state=${slugify(randomState.value)}`}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                >
+                  Funding in {randomState.label}
+                </Link>
+              )}
+              {randomCategory && (
+                <Link
+                  href={`/grants/category/${randomCategory.slug}`}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                >
+                  {randomCategory.label} programs
+                </Link>
+              )}
+              {/* <Link
+                href="/grants?has_apply_link=1"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+              >
+                Grants with apply links
+              </Link>*/}
+            </div>
+          </header>
 
         {/* SEARCH + RESULTS */}
         <section className="space-y-6">
@@ -255,16 +256,16 @@ const [randomCategory] = pickRandom(categoriesWithCounts, 1);
                 By location
               </h2>
               <ul className="space-y-1 text-sm">
-                      {randomState && (
-                      <li key={randomState.value}>
-                        <Link
-                          href={`/grants?state=${slugify(randomState.value)}`}
-                          className="text-blue-700 hover:text-blue-900"
-                        >
-                          Funding in {randomState.label}
-                        </Link>
-                      </li>
-                    )}
+                {randomState && (
+                  <li key={randomState.value}>
+                    <Link
+                      href={`/grants?state=${slugify(randomState.value)}`}
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      Funding in {randomState.label}
+                    </Link>
+                  </li>
+                )}
                 <li className="text-slate-500 text-xs">
                   More states will appear here as coverage expands.
                 </li>
@@ -276,16 +277,16 @@ const [randomCategory] = pickRandom(categoriesWithCounts, 1);
                 By program type
               </h2>
               <ul className="space-y-1 text-sm">
-                   {randomCategory && (
-                    <li key={randomCategory.slug}>
-                      <Link
-                        href={`/grants/category/${randomCategory.slug}`}
-                        className="text-blue-700 hover:text-blue-900"
-                      >
-                        {randomCategory.label} grants
-                      </Link>
-                    </li>
-    )}
+                {randomCategory && (
+                  <li key={randomCategory.slug}>
+                    <Link
+                      href={`/grants/category/${randomCategory.slug}`}
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      {randomCategory.label} grants
+                    </Link>
+                  </li>
+                )}
                 <li>
                   <Link href="/resources" className="text-blue-700 hover:text-blue-900">
                     Tools for grant writing & planning

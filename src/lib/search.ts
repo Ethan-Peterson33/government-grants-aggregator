@@ -3,24 +3,27 @@ import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
   STATEWIDE_CITY_LABELS,
+  findStateInfo,
   inferGrantLocation,
+  isFederalStateValue,
   normalizeStateCode,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
 import { deriveAgencySlug } from "@/lib/slug";
-import { slugify } from "@/lib/strings";
+import { slugify, wordsFromSlug } from "@/lib/strings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
+import type { FacetSets, FilterFacet, Grant, GrantFilters } from "@/lib/types";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
 type TableFeatures = {
   hasStateColumn?: boolean;
   hasCityColumn?: boolean;
+  hasJurisdictionColumn?: boolean;
 };
 
 const TABLE_FEATURES: Record<string, TableFeatures> = {
-  grants: { hasStateColumn: true, hasCityColumn: true },
+  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: false },
 };
 
 /** Safely parse numeric query params */
@@ -70,7 +73,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       ? filters.agencyCode.trim()
       : undefined;
 
-  const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
+  const stateCode = normalizeStateCode(filters.stateCode ?? filters.state ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
   const stateLower = rawStateFilter.toLowerCase();
@@ -150,6 +153,24 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   for (const table of TABLE_FALLBACK_ORDER) {
     const { hasStateColumn = false, hasCityColumn = false } = TABLE_FEATURES[table] ?? {};
 
+    const stateClauses: string[] = [];
+
+    if (stateCode && hasStateColumn) {
+      const candidates = new Set<string>([stateCode, ...stateNameCandidatesFromCode(stateCode)]);
+      for (const candidate of candidates) {
+        const sanitized = escapeIlike(candidate);
+        stateClauses.push(`state.ilike.%${sanitized}%`);
+      }
+    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
+      stateClauses.push(`state.ilike.%${sanitizedState}%`);
+    }
+
+    const applyStateClauses = () => {
+      if (stateClauses.length === 0) return;
+      console.log("🌎 Matching state code candidates", { table, stateCode, clauses: stateClauses });
+      q = q.or(stateClauses.join(","));
+    };
+
     // 🧩 Base query
     let q = supabase
       .from(table)
@@ -175,21 +196,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         console.log("🚫 No matching category codes found for", rawCategoryFilter);
         q = q.eq("category_code", "__none__");
       }
-    }
-
-    /** State filter */
-    if (stateCode && hasStateColumn) {
-      const candidateClauses = stateNameCandidatesFromCode(stateCode).map(
-        (candidate) => `state.ilike.%${escapeIlike(candidate)}%`
-      );
-      const clauses = candidateClauses.length
-        ? candidateClauses
-        : [`state.ilike.%${escapeIlike(stateCode)}%`];
-      console.log("🌎 Matching state code candidates", { table, stateCode, clauses });
-      q = q.or(clauses.join(","));
-    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
-      console.log("🌎 Matching state fragment", { table, state: sanitizedState });
-      q = q.ilike("state", `%${sanitizedState}%`);
     }
 
     /** City filter */
@@ -233,24 +239,64 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     }
 
     /** Jurisdiction filters */
-    if (jurisdiction === "federal" && hasStateColumn) {
-     
-      const orClauses = ["state.is.null", "state.eq.''"];
-      for (const label of FEDERAL_STATE_LABELS) {
-        const sanitizedLabel = escapeIlike(label);
-        orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+    if (jurisdiction === "federal") {
+      const orClauses: string[] = [];
+
+      if (hasStateColumn) {
+        orClauses.push("state.is.null", "state.eq.''");
+        for (const label of FEDERAL_STATE_LABELS) {
+          const sanitizedLabel = escapeIlike(label);
+          orClauses.push(`state.ilike.%${sanitizedLabel}%`);
+        }
       }
-      console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
-      q = q.or(orClauses.join(","));
+
+      // Many federal grants are explicitly typed; include those rows regardless of state text
+      orClauses.push("type.eq.federal", "type.ilike.federal", "base_type.eq.federal", "base_type.ilike.federal");
+
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        orClauses.push("jurisdiction.eq.federal", "jurisdiction.ilike.federal");
+      }
+
+      if (orClauses.length > 0) {
+        console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
+        q = q.or(orClauses.join(","));
+      }
+      applyStateClauses();
     } else if (jurisdiction === "state" && hasCityColumn) {
-     console.log("🗺️ Applying state jurisdiction filter (no city restriction)", { table });
-     
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        q = q.eq("jurisdiction", "state");
+      }
+
+      const statewideCityClauses = ["city.is.null", "city.eq.''"];
+      for (const label of STATEWIDE_CITY_LABELS) {
+        statewideCityClauses.push(`city.ilike.%${escapeIlike(label)}%`);
+      }
+
+      const combinedClauses = stateClauses.length
+        ? [`and(or(${stateClauses.join(",")}),or(${statewideCityClauses.join(",")}))`]
+        : statewideCityClauses;
+
+      console.log("🗺️ Applying state jurisdiction filter (statewide + unspecified cities)", {
+        table,
+        clauses: combinedClauses,
+      });
+
+      if (combinedClauses.length > 0) {
+        q = q.or(combinedClauses.join(","));
+      }
     } else if (jurisdiction === "local" && hasCityColumn) {
+      if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
+        q = q.eq("jurisdiction", "local");
+      }
+
       console.log("🏘️ Applying local jurisdiction filter", { table });
+      applyStateClauses();
       q = q.not("city", "is", null).not("city", "eq", "");
       for (const label of STATEWIDE_CITY_LABELS) {
         q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
       }
+    } else {
+      applyStateClauses();
     }
 
     console.log("🧩 Supabase query composition snapshot:", {
@@ -389,19 +435,54 @@ export async function getFacetSets(): Promise<FacetSets> {
 
   const f: FacetSets = { categories: [], states: [], agencies: [] };
 
-  const clean = (vals: (string | null)[]) =>
-    [...new Set(vals.filter((v): v is string => !!v && v.trim().length > 0))].sort();
+  const toStateFacet = (state: string, count: number): FilterFacet | null => {
+    const trimmed = state.trim();
+    if (!trimmed) return null;
+
+    const info = findStateInfo(trimmed);
+    const slugLabel = wordsFromSlug(slugify(trimmed) ?? trimmed) || trimmed;
+    const label = info?.name ?? slugLabel;
+    const value = info?.code ?? trimmed;
+
+    if (!label || !value) return null;
+    return { label, value, grantCount: count };
+  };
+
+  const ensureFederalFacet = async (existing: FilterFacet[]): Promise<FilterFacet[]> => {
+    const hasFederal = existing.some((facet) => isFederalStateValue(facet.label));
+    if (hasFederal) return existing;
+
+    const federalClauses = [
+      "state.is.null",
+      "state.eq.''",
+      "type.eq.federal",
+      "type.ilike.federal",
+      "base_type.eq.federal",
+      "base_type.ilike.federal",
+    ];
+    for (const label of FEDERAL_STATE_LABELS) {
+      federalClauses.push(`state.ilike.%${escapeIlike(label)}%`);
+    }
+
+    const { count } = await supabase
+      .from("grants")
+      .select("id", { count: "exact", head: true })
+      .or(federalClauses.join(","));
+
+    const federalFacet: FilterFacet = {
+      label: "Federal (nationwide)",
+      value: "Federal (nationwide)",
+      grantCount: count ?? 0,
+    };
+
+    return [federalFacet, ...existing];
+  };
 
   try {
     const [cat, st, ag] = await Promise.all([
-<<<<<<< HEAD
       supabase.rpc("categories_with_counts"),
-      supabase.from("grants").select("state").limit(200),
-=======
-      supabase.from("grant_categories").select("category_label").limit(500),
-      supabase.from("grants").select("state").limit(500),
->>>>>>> dff3295 (updating state page path and filters)
-      supabase.from("grants").select("agency").limit(500),
+      supabase.from("grants").select("state"),
+      supabase.from("grants").select("agency"),
     ]);
 
     const { data: categoryData, error: categoryError } = cat as unknown as {
@@ -420,7 +501,7 @@ export async function getFacetSets(): Promise<FacetSets> {
             typeof item?.category_label === "string" &&
             item.category_label.trim().length > 0 &&
             typeof item?.grant_count === "number" &&
-            item.grant_count > 0,
+            item?.grant_count > 0,
         )
         .map((item) => ({
           slug: item.slug.trim(),
@@ -431,43 +512,74 @@ export async function getFacetSets(): Promise<FacetSets> {
         .slice(0, 100);
     }
 
-<<<<<<< HEAD
-    if (st.error || ag.error) {
-      console.error("❌ facet query failed", st.error || ag.error);
+    const { data: stateData, error: stateError } = st as unknown as {
+      data: { state: string | null }[] | null;
+      error: PostgrestError | null;
+    };
+
+    const { data: agencyData, error: agencyError } = ag as unknown as {
+      data: { agency: string | null }[] | null;
+      error: PostgrestError | null;
+    };
+
+    if (stateError || agencyError) {
+      console.error("❌ facet query failed", stateError || agencyError);
       return f;
     }
-=======
-    // categories (unchanged)
-    f.categories = clean(cat.data.map((x) => x.category_label)).slice(0, 50);
->>>>>>> dff3295 (updating state page path and filters)
 
-    // states: normalize → dedupe → sort
-    const rawStates = clean(st.data.map((x) => x.state));
+    const stateAccumulator = new Map<string, FilterFacet>();
+    if (Array.isArray(stateData)) {
+      for (const entry of stateData) {
+        if (typeof entry?.state !== "string") continue;
+        const facet = toStateFacet(entry.state, 1);
+        if (!facet) continue;
+        const existing = stateAccumulator.get(facet.value);
+        if (existing) {
+          existing.grantCount += 1;
+        } else {
+          stateAccumulator.set(facet.value, { ...facet });
+        }
+      }
+    }
 
-    const normalized = rawStates
-      .map((s) => normalizeStateCode(s) ?? s)
-      .map((s) =>
-        typeof s === "string" && s.length === 2 ? s : s.trim()
-      );
+    const agencyAccumulator = new Map<string, FilterFacet>();
+    if (Array.isArray(agencyData)) {
+      for (const entry of agencyData) {
+        const label = typeof entry?.agency === "string" ? entry.agency.trim() : "";
+        if (!label) continue;
+        const value = label;
+        const existing = agencyAccumulator.get(value);
+        if (existing) {
+          existing.grantCount += 1;
+        } else {
+          agencyAccumulator.set(value, { label, value, grantCount: 1 });
+        }
+      }
+    }
 
-    const uniqueStates = [...new Set(normalized)].sort();
+    const dedupedStates = Array.from(stateAccumulator.values());
+    const sortedStates = dedupedStates.sort((a, b) => a.label.localeCompare(b.label));
+    const dedupedAgencies = Array.from(agencyAccumulator.values());
+    const sortedAgencies = dedupedAgencies
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+      .slice(0, 150);
 
-    const hasFederal = uniqueStates.some((s) =>
-      s.toLowerCase().includes("federal") ||
-      s.toLowerCase().includes("nationwide")
-    );
-
-    f.states = hasFederal
-      ? uniqueStates
-      : ["Federal (nationwide)", ...uniqueStates];
-
-    f.agencies = clean(ag.data.map((x: any) => x.agency)).slice(0, 50);
-
+    const withFederal = await ensureFederalFacet(sortedStates);
+    f.states = withFederal.sort((a, b) => a.label.localeCompare(b.label));
+    f.agencies = sortedAgencies;
   } catch (err) {
     console.error("❌ Error loading facets:", err);
   }
 
-  if (f.states.length === 0) f.states = ["Federal (nationwide)"];
+  if (f.states.length === 0) {
+    f.states = [
+      {
+        label: "Federal (nationwide)",
+        value: "Federal (nationwide)",
+        grantCount: 0,
+      },
+    ];
+  }
 
   return f;
 }

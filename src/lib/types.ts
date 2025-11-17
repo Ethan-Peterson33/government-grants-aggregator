@@ -55,10 +55,16 @@ export type CategoryFacet = {
   grantCount: number;
 };
 
+export type FilterFacet = {
+  label: string;
+  value: string;
+  grantCount: number;
+};
+
 export type FacetSets = {
   categories: CategoryFacet[];
-  states: string[];
-  agencies: string[];
+  states: FilterFacet[];
+  agencies: FilterFacet[];
 };
 
 export type Agency = {

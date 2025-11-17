@@ -104,30 +104,40 @@ export function GrantsSearchClient({
   const searchParams = useSearchParams();
 
   /** LOCKED AGENCY HANDLING */
-  const lockedFilterValues = useMemo(() => {
-    if (!lockedAgency) return undefined;
-    return { agency: lockedAgency.label };
-  }, [lockedAgency]);
+ const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
+  if (!lockedAgency) return undefined;
 
-  const lockedKeys = useMemo(
-    () => new Set((lockedFilterValues ? Object.keys(lockedFilterValues) : []) as (keyof FilterState)[]),
-    [lockedFilterValues]
-  );
+  return {
+    agency: lockedAgency.label,
+  } as Partial<FilterState>;
+}, [lockedAgency]);
 
-  const mergeLockedFilters = useCallback(
-    (filters: NormalizedFilters): NormalizedFilters => {
-      if (!lockedFilterValues) return filters;
-      const next = { ...filters };
-      for (const key of lockedKeys) {
-        const value = lockedFilterValues[key];
-        if (typeof value === "boolean" || typeof value === "string") {
-          (next as any)[key] = value;
-        }
+const lockedKeys = useMemo(
+  () =>
+    new Set(
+      (lockedFilterValues ? Object.keys(lockedFilterValues) : []) as (keyof FilterState)[]
+    ),
+  [lockedFilterValues]
+);
+
+const mergeLockedFilters = useCallback(
+  (filters: NormalizedFilters): NormalizedFilters => {
+    if (!lockedFilterValues) return filters;
+
+    const next = { ...filters };
+
+    for (const key of lockedKeys) {
+      const value = (lockedFilterValues as Partial<FilterState>)[key];
+      if (value !== undefined) {
+        (next as any)[key] = value;
       }
-      return next;
-    },
-    [lockedFilterValues, lockedKeys]
-  );
+    }
+
+    return next;
+  },
+  [lockedFilterValues, lockedKeys]
+);
+
 
   const startingFilters = useMemo(
     () => mergeLockedFilters(normalizeFilters({ ...initialFilters, ...(lockedFilterValues ?? {}) })),

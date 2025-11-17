@@ -280,12 +280,27 @@ export function isStatewideCity(value: string | null | undefined): boolean {
 
 export type GrantLocation =
   | { jurisdiction: "federal" }
+  | { jurisdiction: "private" }
   | { jurisdiction: "state"; stateCode: string }
   | { jurisdiction: "local"; stateCode: string; citySlug: string };
 
 export function inferGrantLocation(
   grant: { state?: string | null; city?: string | null }
 ): GrantLocation {
+  const rawJurisdiction = (grant as { jurisdiction?: string | null; base_type?: string | null; type?: string | null })
+    .jurisdiction;
+  const baseType = (grant as { base_type?: string | null }).base_type;
+  const inferredType = (grant as { type?: string | null }).type;
+
+  const normalizedJurisdiction = (rawJurisdiction || baseType || inferredType || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+
+  if (normalizedJurisdiction === "private") {
+    return { jurisdiction: "private" };
+  }
+
   if (isFederalStateValue(grant.state)) {
     return { jurisdiction: "federal" };
   }

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
-import { GrantCard } from "@/components/grants/grant-card";
-import { Pagination } from "@/components/grants/pagination";
+import type { FilterOption } from "@/components/grants/filters-bar";
+import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
-import { safeNumber, searchGrants } from "@/lib/search";
+import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 import type { GrantFilters } from "@/lib/types";
 import { normalizeCategory } from "@/lib/strings";
+import { resolveStateQueryValue } from "@/lib/grant-location";
 
 const PAGE_SIZE = 12;
 
@@ -15,10 +16,10 @@ export async function generateMetadata({
   params: Promise<{ categorySlug: string }>;
 }): Promise<Metadata> {
   const { categorySlug } = await params;
-  const category = normalizeCategory(categorySlug);
+  const categoryLabel = normalizeCategory(categorySlug);
   return {
-    title: `${category} Grants | Grant Directory`,
-    description: `Browse active ${category.toLowerCase()} grants across agencies and jurisdictions.`,
+    title: `${categoryLabel} Grants`,
+    description: `Browse active ${categoryLabel.toLowerCase()} grants across public and private funders.`,
   };
 }
 
@@ -34,25 +35,58 @@ export default async function CategoryGrantsPage({
 
   const page = safeNumber(resolvedSearchParams?.page, 1);
   const pageSize = Math.min(50, safeNumber(resolvedSearchParams?.pageSize, PAGE_SIZE));
+  const keywordParam = typeof resolvedSearchParams?.keyword === "string" ? resolvedSearchParams.keyword : undefined;
+  const legacyQueryParam = typeof resolvedSearchParams?.query === "string" ? resolvedSearchParams.query : undefined;
+  const query = keywordParam ?? legacyQueryParam;
+  const stateParam = typeof resolvedSearchParams?.state === "string" ? resolvedSearchParams.state : undefined;
+  const resolvedState = resolveStateQueryValue(stateParam);
+  const state = resolvedState.value || stateParam;
+  const agency = typeof resolvedSearchParams?.agency === "string" ? resolvedSearchParams.agency : undefined;
+  const hasApplyLink = resolvedSearchParams?.has_apply_link === "1";
   const jurisdictionParam =
     typeof resolvedSearchParams?.jurisdiction === "string" ? resolvedSearchParams.jurisdiction : undefined;
-  const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local"];
+  const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local", "private"];
   const jurisdiction = allowedJurisdictions.includes(jurisdictionParam as GrantFilters["jurisdiction"])
     ? (jurisdictionParam as GrantFilters["jurisdiction"])
     : undefined;
-  const category = normalizeCategory(resolvedParams.categorySlug);
 
-  const { grants, total } = await searchGrants({
+  const categorySlug = resolvedParams.categorySlug;
+  const categoryLabel = normalizeCategory(categorySlug);
+
+  const filters: GrantFilters = {
     page,
     pageSize,
-    category,
+    query,
+    category: categorySlug,
+    state,
+    stateCode: resolvedState.code,
+    agency,
+    hasApplyLink,
     jurisdiction,
-  });
+  };
+
+  const [{ grants, total, totalPages }, facets] = await Promise.all([
+    searchGrants(filters),
+    getFacetSets(),
+  ]);
+
+  const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
+    label: `${item.label} (${item.grantCount})`,
+    value: item.slug,
+  }));
+  const stateOptions: FilterOption[] = facets.states.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
+  const agencyOptions: FilterOption[] = facets.agencies.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Grants", href: "/grants" },
-    { label: category, href: `/grants/category/${resolvedParams.categorySlug}` },
+    { label: categoryLabel, href: `/grants/category/${categorySlug}` },
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
@@ -61,39 +95,37 @@ export default async function CategoryGrantsPage({
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-slate-900">{category} Grants</h1>
+        <h1 className="text-3xl font-semibold text-slate-900">{categoryLabel} Grants</h1>
         <p className="text-slate-600">
-          Discover current {category.toLowerCase()} funding across federal, state, and local programs.
+          Discover current {categoryLabel.toLowerCase()} funding across federal, state, local, and private programs.
         </p>
       </header>
 
-      <section className="space-y-4">
-        <div className="space-y-4">
-          {grants.length ? (
-            grants.map((grant) => <GrantCard key={grant.id} grant={grant} />)
-          ) : (
-            <div className="rounded-md border border-slate-200 p-8 text-center text-slate-600">
-              No results yet. Try another category or jurisdiction.
-            </div>
-          )}
-        </div>
-        {grants.length > 0 && (
-          <Pagination
-            total={total}
-            pageSize={pageSize}
-            currentPage={page}
-            basePath={`/grants/category/${resolvedParams.categorySlug}`}
-            staticParams={jurisdiction ? { jurisdiction } : undefined}
-          />
-        )}
-      </section>
+      <GrantsSearchClient
+        initialFilters={{
+          query: query ?? "",
+          category: categorySlug,
+          state: state ?? "",
+          agency: agency ?? "",
+          hasApplyLink,
+          page,
+          pageSize,
+        }}
+        initialResults={{ grants, total, page, pageSize, totalPages }}
+        categories={categoryOptions}
+        states={stateOptions}
+        agencies={agencyOptions}
+        lockedFilters={{ category: categorySlug }}
+      />
 
       <script
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+            generateBreadcrumbJsonLd(
+              breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))
+            ),
             itemListJsonLd,
           ]),
         }}

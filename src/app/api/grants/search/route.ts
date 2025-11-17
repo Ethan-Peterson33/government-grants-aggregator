@@ -24,7 +24,10 @@ export async function GET(request: Request) {
   const agencyCode = searchParams.get("agency_code") ?? undefined;
   const jurisdictionParam = searchParams.get("jurisdiction");
   const jurisdiction =
-    jurisdictionParam === "federal" || jurisdictionParam === "state" || jurisdictionParam === "local"
+    jurisdictionParam === "federal" ||
+    jurisdictionParam === "state" ||
+    jurisdictionParam === "local" ||
+    jurisdictionParam === "private"
       ? jurisdictionParam
       : undefined;
   const hasApplyLink = searchParams.get("has_apply_link") === "1";

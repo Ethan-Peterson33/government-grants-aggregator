@@ -27,6 +27,7 @@ type FiltersBarProps = {
   agencies?: FilterOption[];
   isLoading?: boolean;
   lockedFilters?: Partial<FilterState>;
+  showStateFilter?: boolean;
   onFiltersChange?: (next: FilterState, context: FiltersBarChangeContext) => void;
 };
 
@@ -124,6 +125,7 @@ export function FiltersBar({
   agencies = [],
   isLoading = false,
   lockedFilters,
+  showStateFilter = true,
   onFiltersChange,
 }: FiltersBarProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -263,25 +265,27 @@ export function FiltersBar({
       )}
 
       {/* State */}
-      <div className="w-full space-y-1 sm:w-48">
-        <label htmlFor="state" className="text-xs font-semibold uppercase text-slate-500">
-          State
-        </label>
-        <select
-          id="state"
-          value={filterState.state}
-          onChange={handleSelectChange("state")}
-          className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
-          disabled={isLoading || locked.keys.has("state")}
-        >
-          <option value="">All states</option>
-          {stateOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showStateFilter && (
+        <div className="w-full space-y-1 sm:w-48">
+          <label htmlFor="state" className="text-xs font-semibold uppercase text-slate-500">
+            State
+          </label>
+          <select
+            id="state"
+            value={filterState.state}
+            onChange={handleSelectChange("state")}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+            disabled={isLoading || locked.keys.has("state")}
+          >
+            <option value="">All states</option>
+            {stateOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Agency */}
       {agencies.length > 0 && (

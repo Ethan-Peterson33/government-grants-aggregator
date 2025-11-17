@@ -21,6 +21,9 @@ export type Grant = {
   agency_code?: string | null;
   open_date?: string | null;
   close_date?: string | null;
+  jurisdiction?: string | null;
+  base_type?: string | null;
+  type?: string | null;
 
   // 👇 Add this block
   grant_categories?: {
@@ -32,7 +35,7 @@ export type Grant = {
 
 
 
-export type GrantJurisdiction = "federal" | "state" | "local";
+export type GrantJurisdiction = "federal" | "state" | "local" | "private";
 
 export type GrantFilters = {
   query?: string;

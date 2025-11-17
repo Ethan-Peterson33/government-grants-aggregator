@@ -123,6 +123,37 @@ const STATEWIDE_KEYWORDS = [
   "na",
 ];
 
+const PRIVATE_CITY_KEYWORDS = [
+  "grant",
+  "grants",
+  "foundation",
+  "foundations",
+  "fund",
+  "funds",
+  "funding",
+  "fellowship",
+  "fellowships",
+  "scholarship",
+  "scholarships",
+  "private",
+  "corporate",
+];
+
+const STATE_MISSING_SLUGS = new Set([
+  "unknown",
+  "not-available",
+  "not-applicable",
+  "none",
+  "n-a",
+  "na",
+  "unspecified",
+  "not-listed",
+  "not-provided",
+  "citywide",
+  "countywide",
+  "local",
+]);
+
 export const FEDERAL_STATE_LABELS = [
   "Federal",
   "Nationwide",
@@ -160,6 +191,15 @@ export const STATEWIDE_CITY_LABELS = [
   "All Counties",
   "All Regions",
 ];
+
+function looksLikePrivateCitySlug(citySlug: string, titleSlug: string): boolean {
+  if (!citySlug) return false;
+  if (titleSlug && citySlug === titleSlug) {
+    return true;
+  }
+
+  return PRIVATE_CITY_KEYWORDS.some((keyword) => citySlug.includes(keyword));
+}
 
 type ResolvedStateQuery = {
   label: string;
@@ -301,8 +341,19 @@ export function inferGrantLocation(
     return { jurisdiction: "private" };
   }
 
-  const normalizedState = slugify(typeof grant.state === "string" ? grant.state : "");
+  const rawState = typeof grant.state === "string" ? grant.state.trim() : "";
+  const normalizedState = slugify(rawState);
   if (normalizedState.includes("private")) {
+    return { jurisdiction: "private" };
+  }
+
+  const rawCity = typeof grant.city === "string" ? grant.city.trim() : "";
+  const citySlug = rawCity ? slugify(rawCity) : "";
+  const titleSlug = slugify((grant as { title?: string | null }).title ?? "");
+  const stateInfo = findStateInfo(grant.state);
+  const stateLooksMissing = !stateInfo && (!normalizedState || STATE_MISSING_SLUGS.has(normalizedState));
+
+  if (stateLooksMissing && looksLikePrivateCitySlug(citySlug, titleSlug)) {
     return { jurisdiction: "private" };
   }
 
@@ -310,8 +361,6 @@ export function inferGrantLocation(
     return { jurisdiction: "federal" };
   }
 
-  const stateInfo = findStateInfo(grant.state);
-  const rawState = typeof grant.state === "string" ? grant.state.trim() : "";
   const fallbackStateCode = rawState.slice(0, 2) || "US";
   const stateCode = (stateInfo?.code ?? fallbackStateCode).toUpperCase();
 
@@ -319,8 +368,6 @@ export function inferGrantLocation(
     return { jurisdiction: "state", stateCode };
   }
 
-  const rawCity = typeof grant.city === "string" ? grant.city.trim() : "";
-  const citySlug = rawCity ? slugify(rawCity) : "";
   if (!citySlug || STATEWIDE_KEYWORDS.some((keyword) => citySlug.includes(keyword))) {
     return { jurisdiction: "state", stateCode };
   }

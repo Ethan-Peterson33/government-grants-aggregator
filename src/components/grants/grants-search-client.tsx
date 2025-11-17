@@ -114,15 +114,16 @@ export function GrantsSearchClient({
     (filters: NormalizedFilters): NormalizedFilters => {
       if (!lockedFilterValues) return filters;
 
+      const locked = normalizeFilters(lockedFilterValues);
       const next: NormalizedFilters = { ...filters };
+      const writable = next as Record<keyof FilterState, NormalizedFilters[keyof FilterState]>;
 
-      (Object.entries(lockedFilterValues) as [keyof FilterState, string | boolean | undefined][]).forEach(
-        ([key, value]) => {
-          if (value !== undefined) {
-            next[key] = value as NormalizedFilters[typeof key];
-          }
+      (Object.keys(locked) as (keyof FilterState)[]).forEach((key) => {
+        const value = locked[key];
+        if (value !== undefined) {
+          writable[key] = value;
         }
-      );
+      });
 
       return next;
     },

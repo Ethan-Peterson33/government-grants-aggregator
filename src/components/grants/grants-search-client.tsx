@@ -13,6 +13,7 @@ import {
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
 
+import { resolveStateQueryValue } from "@/lib/grant-location";
 import type { SearchResult } from "@/lib/search";
 import type { Grant } from "@/lib/types";
 
@@ -43,13 +44,17 @@ type ParsedSearchParams = {
   hasPageSizeParam: boolean;
 };
 
-const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => ({
-  query: filters.query?.trim() ?? "",
-  category: filters.category?.trim() ?? "",
-  state: filters.state?.trim() ?? "",
-  agency: filters.agency?.trim() ?? "",
-  hasApplyLink: Boolean(filters.hasApplyLink),
-});
+const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => {
+  const resolvedState = resolveStateQueryValue(filters.state);
+
+  return {
+    query: filters.query?.trim() ?? "",
+    category: filters.category?.trim() ?? "",
+    state: resolvedState.value || filters.state?.trim() || "",
+    agency: filters.agency?.trim() ?? "",
+    hasApplyLink: Boolean(filters.hasApplyLink),
+  };
+};
 
 const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
   a.query === b.query &&
@@ -141,10 +146,12 @@ export function GrantsSearchClient({
       const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
       const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : DEFAULT_PAGE_SIZE;
 
+      const stateQueryValue = resolveStateQueryValue(params?.get("state") ?? undefined).value;
+
       const filters = normalizeFilters({
         query: params?.get("keyword") ?? "",
         category: params?.get("category") ?? "",
-        state: params?.get("state") ?? "",
+        state: stateQueryValue ?? "",
         agency: params?.get("agency") ?? "",
         hasApplyLink: params?.get("has_apply_link") === "1",
       });

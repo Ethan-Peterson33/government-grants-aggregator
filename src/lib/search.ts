@@ -438,8 +438,8 @@ export async function getFacetSets(): Promise<FacetSets> {
   try {
     const [cat, st, ag] = await Promise.all([
       supabase.rpc("categories_with_counts"),
-      supabase.from("grants").select("state, count:id", { head: false }).group("state"),
-      supabase.from("grants").select("agency, count:id", { head: false }).group("agency"),
+      supabase.from("grants").select("state"),
+      supabase.from("grants").select("agency"),
     ]);
 
     const { data: categoryData, error: categoryError } = cat as unknown as {
@@ -469,51 +469,48 @@ export async function getFacetSets(): Promise<FacetSets> {
         .slice(0, 100);
     }
 
-    if (st.error || ag.error) {
-      console.error("❌ facet query failed", st.error || ag.error);
+    const { data: stateData, error: stateError } = st as unknown as {
+      data: { state: string | null }[] | null;
+      error: PostgrestError | null;
+    };
+
+    const { data: agencyData, error: agencyError } = ag as unknown as {
+      data: { agency: string | null }[] | null;
+      error: PostgrestError | null;
+    };
+
+    if (stateError || agencyError) {
+      console.error("❌ facet query failed", stateError || agencyError);
       return f;
     }
 
-    const states = Array.isArray(st.data)
-      ? (st.data
-          .map((entry: any) => {
-            if (typeof entry?.state !== "string") return null;
-            const countValue = typeof entry?.count === "number" ? entry.count : Number(entry?.count ?? 0);
-            const count = Number.isFinite(countValue) ? countValue : 0;
-            return toStateFacet(entry.state, count);
-          })
-          .filter((facet): facet is FilterFacet => Boolean(facet)) as FilterFacet[])
-      : [];
-
     const stateAccumulator = new Map<string, FilterFacet>();
-    for (const facet of states) {
-      const existing = stateAccumulator.get(facet.value);
-      if (existing) {
-        existing.grantCount += facet.grantCount;
-      } else {
-        stateAccumulator.set(facet.value, { ...facet });
+    if (Array.isArray(stateData)) {
+      for (const entry of stateData) {
+        if (typeof entry?.state !== "string") continue;
+        const facet = toStateFacet(entry.state, 1);
+        if (!facet) continue;
+        const existing = stateAccumulator.get(facet.value);
+        if (existing) {
+          existing.grantCount += 1;
+        } else {
+          stateAccumulator.set(facet.value, { ...facet });
+        }
       }
     }
 
-    const agencies = Array.isArray(ag.data)
-      ? (ag.data
-          .map((entry: any) => {
-            const label = typeof entry?.agency === "string" ? entry.agency.trim() : "";
-            const countValue = typeof entry?.count === "number" ? entry.count : Number(entry?.count ?? 0);
-            const count = Number.isFinite(countValue) ? countValue : 0;
-            if (!label) return null;
-            return { label, value: label, grantCount: count } satisfies FilterFacet;
-          })
-          .filter((facet): facet is FilterFacet => Boolean(facet)) as FilterFacet[])
-      : [];
-
     const agencyAccumulator = new Map<string, FilterFacet>();
-    for (const facet of agencies) {
-      const existing = agencyAccumulator.get(facet.value);
-      if (existing) {
-        existing.grantCount += facet.grantCount;
-      } else {
-        agencyAccumulator.set(facet.value, { ...facet });
+    if (Array.isArray(agencyData)) {
+      for (const entry of agencyData) {
+        const label = typeof entry?.agency === "string" ? entry.agency.trim() : "";
+        if (!label) continue;
+        const value = label;
+        const existing = agencyAccumulator.get(value);
+        if (existing) {
+          existing.grantCount += 1;
+        } else {
+          agencyAccumulator.set(value, { label, value, grantCount: 1 });
+        }
       }
     }
 

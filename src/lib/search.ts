@@ -23,7 +23,7 @@ type TableFeatures = {
 };
 
 const TABLE_FEATURES: Record<string, TableFeatures> = {
-  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: true },
+  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: false },
 };
 
 /** Safely parse numeric query params */

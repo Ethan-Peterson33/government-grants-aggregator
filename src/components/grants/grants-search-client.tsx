@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -195,6 +195,8 @@ export function GrantsSearchClient({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const expectedSearchParamsRef = useRef<string | null>(null);
+
   const additionalParams = useMemo(() => {
     if (!lockedAgency) return undefined;
     const extra: Record<string, string> = { agency_slug: lockedAgency.slug };
@@ -211,6 +213,8 @@ export function GrantsSearchClient({
         includeDefaults: false,
         additionalParams,
       });
+
+      expectedSearchParamsRef.current = params.toString();
 
       router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
     },
@@ -266,6 +270,19 @@ export function GrantsSearchClient({
    * URL → FILTERBAR SYNC
    -----------------------------*/
   useEffect(() => {
+    const currentSearchString = searchParams.toString();
+
+    if (
+      expectedSearchParamsRef.current &&
+      currentSearchString !== expectedSearchParamsRef.current
+    ) {
+      return;
+    }
+
+    if (currentSearchString === expectedSearchParamsRef.current) {
+      expectedSearchParamsRef.current = null;
+    }
+
     const parsed = parseSearchParams(searchParams);
     const mergedFilters = mergeLockedFilters(parsed.filters);
 

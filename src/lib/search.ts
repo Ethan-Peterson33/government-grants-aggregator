@@ -250,6 +250,9 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         }
       }
 
+      // Many federal grants are explicitly typed; include those rows regardless of state text
+      orClauses.push("type.eq.federal", "type.ilike.federal", "base_type.eq.federal", "base_type.ilike.federal");
+
       if (TABLE_FEATURES[table]?.hasJurisdictionColumn) {
         orClauses.push("jurisdiction.eq.federal", "jurisdiction.ilike.federal");
       }
@@ -451,7 +454,14 @@ export async function getFacetSets(): Promise<FacetSets> {
     const hasFederal = existing.some((facet) => isFederalStateValue(facet.label));
     if (hasFederal) return existing;
 
-    const federalClauses = ["state.is.null", "state.eq.''"];
+    const federalClauses = [
+      "state.is.null",
+      "state.eq.''",
+      "type.eq.federal",
+      "type.ilike.federal",
+      "base_type.eq.federal",
+      "base_type.ilike.federal",
+    ];
     for (const label of FEDERAL_STATE_LABELS) {
       federalClauses.push(`state.ilike.%${escapeIlike(label)}%`);
     }

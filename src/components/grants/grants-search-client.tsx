@@ -1,15 +1,27 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  useEffect
+} from "react";
+import {
+  usePathname,
+  useRouter,
+  useSearchParams
+} from "next/navigation";
+
 import {
   FiltersBar,
   type FilterOption,
   type FilterState,
   type FiltersBarChangeContext,
 } from "@/components/grants/filters-bar";
+
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
+
 import type { SearchResult } from "@/lib/search";
 import type { Grant } from "@/lib/types";
 
@@ -28,11 +40,6 @@ export type GrantsSearchClientProps = {
   states: FilterOption[];
   agencies: FilterOption[];
   lockedAgency?: LockedAgency;
-};
-
-type CanonicalOptions = {
-  includeDefaults?: boolean;
-  additionalParams?: Record<string, string | undefined>;
 };
 
 type NormalizedFilters = FilterState;
@@ -56,11 +63,11 @@ export const serializeFilters = (
   filters: NormalizedFilters,
   page: number,
   pageSize: number,
-  options: CanonicalOptions = {},
+  options: { includeDefaults?: boolean; additionalParams?: Record<string, string | undefined> } = {}
 ): URLSearchParams => {
   const params = new URLSearchParams();
-  const keyword = filters.query.trim();
-  if (keyword) params.set("keyword", keyword);
+
+  if (filters.query.trim()) params.set("keyword", filters.query.trim());
   if (filters.category) params.set("category", filters.category);
   if (filters.state) params.set("state", filters.state);
   if (filters.agency) params.set("agency", filters.agency);
@@ -76,9 +83,7 @@ export const serializeFilters = (
 
   if (options.additionalParams) {
     for (const [key, value] of Object.entries(options.additionalParams)) {
-      if (typeof value === "string" && value.trim().length > 0) {
-        params.set(key, value.trim());
-      }
+      if (value?.trim()) params.set(key, value.trim());
     }
   }
 
@@ -93,10 +98,13 @@ export function GrantsSearchClient({
   agencies,
   lockedAgency,
 }: GrantsSearchClientProps) {
+
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
+  /** LOCKED AGENCY HANDLING */
+  const lockedFilterValues = useMemo(() => {
     if (!lockedAgency) return undefined;
     return { agency: lockedAgency.label };
   }, [lockedAgency]);
@@ -138,29 +146,34 @@ export function GrantsSearchClient({
   const additionalParams = useMemo(() => {
     if (!lockedAgency) return undefined;
     const extra: Record<string, string> = { agency_slug: lockedAgency.slug };
-    if (lockedAgency.code) {
-      extra.agency_code = lockedAgency.code;
-    }
+    if (lockedAgency.code) extra.agency_code = lockedAgency.code;
     return extra;
   }, [lockedAgency]);
 
+  /** ----------------------------
+   * URL UPDATE
+   -----------------------------*/
   const updateUrl = useCallback(
     (filters: NormalizedFilters, nextPage: number, nextPageSize: number) => {
       const params = serializeFilters(filters, nextPage, nextPageSize, {
         includeDefaults: false,
         additionalParams,
       });
-      const search = params.toString();
-      router.replace(search ? `${pathname}?${search}` : pathname, { scroll: false });
+      router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
     },
     [additionalParams, pathname, router]
   );
 
+  /** ----------------------------
+   * API SEARCH
+   -----------------------------*/
   const performSearch = useCallback(
     async (filters: NormalizedFilters, nextPage: number) => {
       const effectiveFilters = mergeLockedFilters(filters);
       const nextPageSize = pageSize || DEFAULT_PAGE_SIZE;
+
       updateUrl(effectiveFilters, nextPage, nextPageSize);
+
       setIsLoading(true);
       setError(null);
 
@@ -169,29 +182,27 @@ export function GrantsSearchClient({
           includeDefaults: true,
           additionalParams,
         });
+
         const response = await fetch(`/api/grants/search?${requestParams.toString()}`, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
 
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Search failed: ${response.status}`);
 
         const data: SearchResult = await response.json();
+
         setResults(data.grants);
         setTotal(data.total);
         setPage(data.page);
         setPageSize(data.pageSize);
         setTotalPages(data.totalPages);
         setAppliedFilters(effectiveFilters);
+
       } catch (err) {
-        console.error("Grant search failed", err);
+        console.error(err);
         setResults([]);
-        setTotal(0);
-        setTotalPages(0);
-        setPage(nextPage);
-        setError("We couldn't load new grants right now. Please try again.");
+        setError("Unable to load grants. Try again.");
       } finally {
         setIsLoading(false);
       }
@@ -199,14 +210,40 @@ export function GrantsSearchClient({
     [additionalParams, mergeLockedFilters, pageSize, updateUrl]
   );
 
+  /** ----------------------------
+   * URL → FILTERBAR SYNC
+   -----------------------------*/
+  useEffect(() => {
+    if (!searchParams) return;
+
+    const urlFilters: NormalizedFilters = normalizeFilters({
+      query: searchParams.get("keyword") ?? "",
+      category: searchParams.get("category") ?? "",
+      state: searchParams.get("state") ?? "",
+      agency: searchParams.get("agency") ?? "",
+      hasApplyLink: searchParams.get("has_apply_link") === "1",
+    });
+
+    const merged = mergeLockedFilters(urlFilters);
+
+    const nextPage = Number(searchParams.get("page") ?? 1);
+
+    if (!areFiltersEqual(merged, appliedFilters)) {
+      setAppliedFilters(merged);
+      void performSearch(merged, nextPage);
+    }
+  }, [searchParams, mergeLockedFilters, appliedFilters, performSearch]);
+
+  /** FILTERBAR CHANGE HANDLING */
   const handleFiltersChange = useCallback(
     (next: FilterState, context: FiltersBarChangeContext) => {
       const normalized = mergeLockedFilters(normalizeFilters(next));
       const targetPage = 1;
-      if (context.reason === "submit" || context.reason === "change" || context.reason === "debounced") {
-        if (areFiltersEqual(normalized, appliedFilters) && targetPage === page) {
-          return;
-        }
+
+      if (context.reason === "submit" ||
+          context.reason === "change" ||
+          context.reason === "debounced") {
+        if (areFiltersEqual(normalized, appliedFilters) && targetPage === page) return;
         void performSearch(normalized, targetPage);
       }
     },
@@ -224,6 +261,9 @@ export function GrantsSearchClient({
   const hasResults = results.length > 0;
   const showPagination = hasResults && totalPages > 1;
 
+  /** ----------------------------
+   * RENDER
+   -----------------------------*/
   return (
     <div className="space-y-6">
       <FiltersBar
@@ -237,11 +277,14 @@ export function GrantsSearchClient({
       />
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-800">Latest opportunities ({total})</h2>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Latest opportunities ({total})
+        </h2>
+
         <div className="space-y-4">
           {isLoading && (
-            <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-10" role="status">
-              <span className="sr-only">Loading grants…</span>
+            <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-10">
+              <span className="sr-only">Loading…</span>
               <svg className="h-6 w-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
@@ -250,14 +293,18 @@ export function GrantsSearchClient({
           )}
 
           {!isLoading && error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</div>
+            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+              {error}
+            </div>
           )}
 
-          {!isLoading && !error && hasResults && results.map((grant: Grant) => <GrantCard key={grant.id} grant={grant} />)}
+          {!isLoading && !error && hasResults &&
+            results.map((grant) => <GrantCard key={grant.id} grant={grant} />)
+          }
 
           {!isLoading && !error && !hasResults && (
-            <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
-              <p>No grants match your filters yet. Try broadening your search or exploring another category.</p>
+            <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm">
+              No grants match your filters.
             </div>
           )}
         </div>

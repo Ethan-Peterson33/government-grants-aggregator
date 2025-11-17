@@ -138,12 +138,28 @@ export const FEDERAL_STATE_LABELS = [
   "Across the Nation",
 ];
 
-export const STATEWIDE_CITY_LABELS = Array.from(
-  new Set([
-    ...STATEWIDE_KEYWORDS.map((keyword) => keyword.replace(/-/g, " ")), // raw lowercase phrases
-    ...STATEWIDE_KEYWORDS.map((keyword) => wordsFromSlug(keyword)), // title-cased phrases
-  ])
-);
+export const STATEWIDE_CITY_LABELS = [
+  "statewide",
+  "whole state",
+  "state wide",
+  "across the state",
+  "multiple locations",
+  "multiple counties",
+  "various locations",
+  "entire state",
+  "all counties",
+  "all regions",
+  "Statewide",
+  "Whole State",
+  "State Wide",
+  "Across The State",
+  "Multiple Locations",
+  "Multiple Counties",
+  "Various Locations",
+  "Entire State",
+  "All Counties",
+  "All Regions",
+];
 
 export function findStateInfo(value: string | null | undefined): StateInfo | null {
   if (typeof value !== "string") return null;

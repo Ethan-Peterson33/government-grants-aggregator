@@ -4,7 +4,7 @@ import { Breadcrumb } from "@/components/grants/breadcrumb";
 import type { FilterOption } from "@/components/grants/filters-bar";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { RelatedLinks } from "@/components/grants/related-links";
-import { normalizeStateCode } from "@/lib/grant-location";
+import { normalizeStateCode, resolveStateQueryValue } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 import { slugify } from "@/lib/strings";
@@ -31,11 +31,12 @@ export async function generateMetadata({
   const query = keyword ?? legacyQuery;
   const category = typeof params?.category === "string" ? params.category : undefined;
   const state = typeof params?.state === "string" ? params.state : undefined;
+  const stateDisplay = resolveStateQueryValue(state).label || state;
   const agency = typeof params?.agency === "string" ? params.agency : undefined;
 
   const segments: string[] = ["Government Grants"];
   if (category) segments.unshift(`${category} grants`);
-  if (state) segments.unshift(`${state} opportunities`);
+  if (stateDisplay) segments.unshift(`${stateDisplay} opportunities`);
   if (agency) segments.unshift(`${agency} programs`);
   if (query) segments.unshift(`Results for "${query}"`);
 
@@ -79,10 +80,12 @@ export default async function GrantsIndexPage({
   const keywordParam = typeof params?.keyword === "string" ? params.keyword : undefined;
   const query = keywordParam ?? queryParam;
   const category = typeof params?.category === "string" ? params.category : undefined;
-  const state = typeof params?.state === "string" ? params.state : undefined;
+  const stateParam = typeof params?.state === "string" ? params.state : undefined;
+  const resolvedState = resolveStateQueryValue(stateParam);
+  const state = resolvedState.value || stateParam;
   const agency = typeof params?.agency === "string" ? params.agency : undefined;
   const hasApplyLink = params?.has_apply_link === "1";
-  const stateCode = normalizeStateCode(state ?? undefined) ?? undefined;
+  const stateCode = normalizeStateCode(resolvedState.code ?? state ?? undefined) ?? undefined;
 
   const filters = {
     page,

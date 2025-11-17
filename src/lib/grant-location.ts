@@ -161,6 +161,13 @@ export const STATEWIDE_CITY_LABELS = [
   "All Regions",
 ];
 
+type ResolvedStateQuery = {
+  label: string;
+  value: string;
+  code?: string;
+  jurisdiction: GrantJurisdiction | null;
+};
+
 export function findStateInfo(value: string | null | undefined): StateInfo | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -200,6 +207,38 @@ export function resolveStateParam(param?: string) {
   if (found) return { code: found.code, name: found.name };
 
   return { code: "", name: "Unknown" };
+}
+
+export function resolveStateQueryValue(raw?: string): ResolvedStateQuery {
+  const fallback: ResolvedStateQuery = { label: "", value: "", jurisdiction: null };
+  if (typeof raw !== "string") return fallback;
+
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+
+  const slug = slugify(trimmed);
+  const isFederalSlug = isFederalStateValue(trimmed);
+
+  if (isFederalSlug) {
+    return {
+      label: "Federal (nationwide)",
+      value: "Federal (nationwide)",
+      jurisdiction: "federal",
+    };
+  }
+
+  const stateInfo = findStateInfo(trimmed);
+  if (stateInfo) {
+    return {
+      label: stateInfo.name,
+      value: stateInfo.code,
+      code: stateInfo.code,
+      jurisdiction: "state",
+    };
+  }
+
+  const label = (slug && wordsFromSlug(slug)) || sentenceCase(trimmed);
+  return { label, value: trimmed, jurisdiction: null };
 }
 
 

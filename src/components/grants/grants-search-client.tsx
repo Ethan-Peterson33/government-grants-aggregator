@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -13,6 +13,7 @@ import {
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
 
+import { resolveStateQueryValue } from "@/lib/grant-location";
 import type { SearchResult } from "@/lib/search";
 import type { Grant } from "@/lib/types";
 
@@ -43,13 +44,17 @@ type ParsedSearchParams = {
   hasPageSizeParam: boolean;
 };
 
-const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => ({
-  query: filters.query?.trim() ?? "",
-  category: filters.category?.trim() ?? "",
-  state: filters.state?.trim() ?? "",
-  agency: filters.agency?.trim() ?? "",
-  hasApplyLink: Boolean(filters.hasApplyLink),
-});
+const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => {
+  const resolvedState = resolveStateQueryValue(filters.state);
+
+  return {
+    query: filters.query?.trim() ?? "",
+    category: filters.category?.trim() ?? "",
+    state: resolvedState.value || filters.state?.trim() || "",
+    agency: filters.agency?.trim() ?? "",
+    hasApplyLink: Boolean(filters.hasApplyLink),
+  };
+};
 
 const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
   a.query === b.query &&
@@ -141,10 +146,12 @@ export function GrantsSearchClient({
       const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
       const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : DEFAULT_PAGE_SIZE;
 
+      const stateQueryValue = resolveStateQueryValue(params?.get("state") ?? undefined).value;
+
       const filters = normalizeFilters({
         query: params?.get("keyword") ?? "",
         category: params?.get("category") ?? "",
-        state: params?.get("state") ?? "",
+        state: stateQueryValue ?? "",
         agency: params?.get("agency") ?? "",
         hasApplyLink: params?.get("has_apply_link") === "1",
       });
@@ -188,6 +195,8 @@ export function GrantsSearchClient({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const expectedSearchParamsRef = useRef<string | null>(null);
+
   const additionalParams = useMemo(() => {
     if (!lockedAgency) return undefined;
     const extra: Record<string, string> = { agency_slug: lockedAgency.slug };
@@ -204,6 +213,8 @@ export function GrantsSearchClient({
         includeDefaults: false,
         additionalParams,
       });
+
+      expectedSearchParamsRef.current = params.toString();
 
       router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
     },
@@ -259,6 +270,19 @@ export function GrantsSearchClient({
    * URL → FILTERBAR SYNC
    -----------------------------*/
   useEffect(() => {
+    const currentSearchString = searchParams.toString();
+
+    if (
+      expectedSearchParamsRef.current &&
+      currentSearchString !== expectedSearchParamsRef.current
+    ) {
+      return;
+    }
+
+    if (currentSearchString === expectedSearchParamsRef.current) {
+      expectedSearchParamsRef.current = null;
+    }
+
     const parsed = parseSearchParams(searchParams);
     const mergedFilters = mergeLockedFilters(parsed.filters);
 

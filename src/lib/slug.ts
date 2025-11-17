@@ -43,7 +43,7 @@ export function grantPath(
   }
 
   if (location.jurisdiction === "private") {
-    return withIdQuery(`/grants/private`, grantId);
+    return withIdQuery(`/grants/private/${finalSlug}`, grantId);
   }
 
   if (location.jurisdiction === "state") {

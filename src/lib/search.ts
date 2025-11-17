@@ -273,9 +273,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       }
 
       const combinedClauses = stateClauses.length
-        ? stateClauses.flatMap((stateClause) =>
-            statewideCityClauses.map((cityClause) => `and(${stateClause},${cityClause})`)
-          )
+        ? [`and(or(${stateClauses.join(",")}),or(${statewideCityClauses.join(",")}))`]
         : statewideCityClauses;
 
       console.log("🗺️ Applying state jurisdiction filter (statewide + unspecified cities)", {

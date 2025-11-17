@@ -292,12 +292,12 @@ export function inferGrantLocation(
   const baseType = (grant as { base_type?: string | null }).base_type;
   const inferredType = (grant as { type?: string | null }).type;
 
-  const normalizedJurisdiction = (rawJurisdiction || baseType || inferredType || "")
-    .toString()
-    .trim()
-    .toLowerCase();
+  const jurisdictionCandidates = [rawJurisdiction, baseType, inferredType]
+    .map((value) => (typeof value === "string" ? value : typeof value === "number" ? String(value) : ""))
+    .map((value) => slugify(value))
+    .filter(Boolean);
 
-  if (normalizedJurisdiction === "private") {
+  if (jurisdictionCandidates.some((candidate) => candidate.includes("private"))) {
     return { jurisdiction: "private" };
   }
 

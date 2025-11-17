@@ -7,6 +7,7 @@ import {
   inferGrantLocation,
   isFederalStateValue,
   normalizeStateCode,
+  resolveStateQueryValue,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
 import { deriveAgencySlug } from "@/lib/slug";
@@ -62,7 +63,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const slugCandidate = rawCategoryFilter ? slugify(rawCategoryFilter) : "";
 
   const rawStateFilter = typeof filters.state === "string" ? filters.state.trim() : "";
-  const sanitizedState = like(filters.state);
+  const normalizedState = resolveStateQueryValue(rawStateFilter);
+  const sanitizedState = like(normalizedState.value || filters.state);
   const sanitizedCity = like(filters.city);
   const sanitizedAgency = like(filters.agency);
 
@@ -76,19 +78,14 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       ? filters.agencyCode.trim()
       : undefined;
 
-  const stateCode = normalizeStateCode(filters.stateCode ?? filters.state ?? undefined);
+  const stateCode = normalizeStateCode(
+    filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined,
+  );
   const hasApplyLink = filters.hasApplyLink === true;
 
-  const stateLower = rawStateFilter.toLowerCase();
-  const isFederalStateFilter =
-    stateLower === "federal" ||
-    stateLower === "federal (nationwide)" ||
-    stateLower === "nationwide";
+  const isFederalStateFilter = normalizedState.jurisdiction === "federal";
 
-  let jurisdiction = filters.jurisdiction ?? undefined;
-  if (!jurisdiction && isFederalStateFilter) {
-    jurisdiction = "federal";
-  }
+  const jurisdiction = filters.jurisdiction ?? normalizedState.jurisdiction ?? undefined;
 
   /** ------------------------------
    * CATEGORY CODE RESOLUTION

@@ -24,7 +24,7 @@ type TableFeatures = {
 };
 
 const TABLE_FEATURES: Record<string, TableFeatures> = {
-  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: false },
+  grants: { hasStateColumn: true, hasCityColumn: true, hasJurisdictionColumn: true },
 };
 
 /** Safely parse numeric query params */
@@ -148,7 +148,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
    *  EXECUTION LOOP (only one table today)
    * -----------------------------------------------------------------*/
   for (const table of TABLE_FALLBACK_ORDER) {
-    const { hasStateColumn = false, hasCityColumn = false } = TABLE_FEATURES[table] ?? {};
+    const { hasStateColumn = false, hasCityColumn = false, hasJurisdictionColumn = false } =
+      TABLE_FEATURES[table] ?? {};
 
     /** ------------------------------
      * STATE CLAUSES
@@ -207,7 +208,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     /** ------------------------------
      * CITY FILTER
      * ------------------------------*/
-    if (sanitizedCity && hasCityColumn) {
+    if (sanitizedCity && hasCityColumn && jurisdiction !== "private") {
       q = q.ilike("city", `%${sanitizedCity}%`);
     }
 
@@ -273,24 +274,29 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.or(orClauses.join(","));
     }
 
-  
-/** ---------- SIMPLE STATE FILTER (include ALL grants in that state) ---------- */
-else if (jurisdiction === "state" && hasStateColumn) {
-  if (stateClauses.length === 0) {
-    // No valid state filter → nothing to apply
-    continue;
-  }
+    /** ---------- SIMPLE STATE FILTER (include ALL grants in that state) ---------- */
+    else if (jurisdiction === "state" && hasStateColumn) {
+      if (stateClauses.length === 0) {
+        // No valid state filter → nothing to apply
+        continue;
+      }
 
-  console.log("🗺️ Applying simple state filter (include ALL grants with this state)", {
-    table,
-    clauses: stateClauses,
-  });
+      console.log("🗺️ Applying simple state filter (include ALL grants with this state)", {
+        table,
+        clauses: stateClauses,
+      });
 
-  // Just match the state. No city filters at all.
-  q = q.or(stateClauses.join(","));
-}
+      // Just match the state. No city filters at all.
+      q = q.or(stateClauses.join(","));
+    }
 
-
+    /** ---------- PRIVATE ----------*/
+    else if (jurisdiction === "private") {
+      if (hasJurisdictionColumn) {
+        q = q.eq("jurisdiction", "private");
+      }
+      // Skip all locality/state filters for private grants.
+    }
 
     /** ---------- LOCAL ----------*/
     else if (jurisdiction === "local" && hasCityColumn) {
@@ -376,11 +382,20 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   const category = toComparable(filters.category);
   if (category && !textIncludes(grant.category, category)) return false;
 
+  const normalizedJurisdiction = (grant.jurisdiction || grant.base_type || grant.type || "")
+    .toString()
+    .trim()
+    .toLowerCase();
+
   const location = inferGrantLocation(grant);
   const filterStateCode = normalizeStateCode(filters.stateCode ?? undefined);
 
+  if (filters.jurisdiction === "private") {
+    if (normalizedJurisdiction !== "private" && location.jurisdiction !== "private") return false;
+  }
+
   if (filterStateCode) {
-    if (location.jurisdiction === "federal") return false;
+    if (location.jurisdiction === "federal" || location.jurisdiction === "private") return false;
     if (location.stateCode.toUpperCase() !== filterStateCode) return false;
   }
 

@@ -45,7 +45,7 @@ export async function generateMetadata({
   return {
     title: segments.join(" | "),
     description:
-      "Explore the latest government funding opportunities with powerful filters for category, agency, state, and keyword.",
+      "Explore the latest funding opportunities from government agencies and private funders with powerful filters for category, agency, state, and keyword.",
     alternates: {
       canonical,
     },
@@ -53,7 +53,7 @@ export async function generateMetadata({
       url: canonical,
       title: segments.join(" | "),
       description:
-        "Explore the latest government funding opportunities with powerful filters for category, agency, state, and keyword.",
+        "Explore the latest funding opportunities from government agencies and private funders with powerful filters for category, agency, state, and keyword.",
     },
   };
 }
@@ -171,16 +171,17 @@ export default async function GrantsIndexPage({
           {/* HERO / INTRO */}
           <header className="space-y-4 rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-              Find public funding faster
+              Find funding faster
             </p>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-                Search government grants in one place
+                Search grants from public and private funders in one place
               </h1>
               <p className="text-slate-600 text-sm sm:text-base">
-                Browse federal opportunities and growing coverage of state and local programs.
-                Filter by keyword, agency, or eligibility to find grants that match your nonprofit,
-                small business, or community project.
+                Browse funding opportunities from federal agencies, states, local governments,
+                private foundations, and corporate programs. Filter by keyword, agency, or
+                eligibility to find grants that match your nonprofit, small business, or community
+                project.
               </p>
             </div>
 
@@ -280,19 +281,28 @@ export default async function GrantsIndexPage({
                 By program type
               </h2>
               <ul className="space-y-1 text-sm">
-                {randomCategory && (
-                  <li key={randomCategory.slug}>
-                    <Link
-                      href={`/grants/category/${randomCategory.slug}`}
-                      className="text-blue-700 hover:text-blue-900"
-                    >
-                      {randomCategory.label} grants
-                    </Link>
-                  </li>
-                )}
                 <li>
-                  <Link href="/resources" className="text-blue-700 hover:text-blue-900">
-                    Tools for grant writing & planning
+                  <Link
+                    href="/grants/category/small-business"
+                    className="text-blue-700 hover:text-blue-900"
+                  >
+                    Small business grants
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/grants/category/nonprofit"
+                    className="text-blue-700 hover:text-blue-900"
+                  >
+                    Nonprofit grants
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/grants/category/community"
+                    className="text-blue-700 hover:text-blue-900"
+                  >
+                    Local community funding
                   </Link>
                 </li>
               </ul>
@@ -313,38 +323,25 @@ export default async function GrantsIndexPage({
           <ul className="space-y-2">
             <li>
               <Link
-                href="/resources"
+                href="/grants/category/small-business"
                 className="text-blue-700 font-medium hover:text-blue-900 transition"
               >
-                🧰 Explore tools & resources
+                Small business grant resources
               </Link>
               <p className="text-slate-500 text-xs mt-1">
-                Grant writing templates, formation kits, and proposal tools.
+                Search funding and guides tailored to startups and established businesses.
               </p>
             </li>
 
             <li>
               <Link
-                href="/contact"
+                href="/grants/category/nonprofit"
                 className="text-blue-700 font-medium hover:text-blue-900 transition"
               >
-                📬 Contact our team
+                Nonprofit funding resources
               </Link>
               <p className="text-slate-500 text-xs mt-1">
-                Reach out for partnership, corrections, or support inquiries.
-              </p>
-            </li>
-
-            <li>
-              <Link
-                href="https://www.grants.gov/"
-                target="_blank"
-                className="text-blue-700 font-medium hover:text-blue-900 transition"
-              >
-                🏛 Visit Grants.gov
-              </Link>
-              <p className="text-slate-500 text-xs mt-1">
-                Confirm official eligibility, deadlines, and application instructions.
+                Explore private and government programs that support charitable missions.
               </p>
             </li>
           </ul>

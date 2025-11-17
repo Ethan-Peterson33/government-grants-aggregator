@@ -1,16 +1,7 @@
 "use client";
 
-import {
-  useCallback,
-  useMemo,
-  useState,
-  useEffect
-} from "react";
-import {
-  usePathname,
-  useRouter,
-  useSearchParams
-} from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   FiltersBar,
@@ -43,6 +34,14 @@ export type GrantsSearchClientProps = {
 };
 
 type NormalizedFilters = FilterState;
+
+type ParsedSearchParams = {
+  filters: NormalizedFilters;
+  page: number;
+  pageSize: number;
+  hasPageParam: boolean;
+  hasPageSizeParam: boolean;
+};
 
 const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => ({
   query: filters.query?.trim() ?? "",
@@ -98,57 +97,92 @@ export function GrantsSearchClient({
   agencies,
   lockedAgency,
 }: GrantsSearchClientProps) {
-
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   /** LOCKED AGENCY HANDLING */
- const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
-  if (!lockedAgency) return undefined;
+  const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
+    if (!lockedAgency) return undefined;
 
-  return {
-    agency: lockedAgency.label,
-  } as Partial<FilterState>;
-}, [lockedAgency]);
+    return {
+      agency: lockedAgency.label,
+    } as Partial<FilterState>;
+  }, [lockedAgency]);
 
-const lockedKeys = useMemo(
-  () =>
-    new Set(
-      (lockedFilterValues ? Object.keys(lockedFilterValues) : []) as (keyof FilterState)[]
-    ),
-  [lockedFilterValues]
-);
+  const mergeLockedFilters = useCallback(
+    (filters: NormalizedFilters): NormalizedFilters => {
+      if (!lockedFilterValues) return filters;
 
-const mergeLockedFilters = useCallback(
-  (filters: NormalizedFilters): NormalizedFilters => {
-    if (!lockedFilterValues) return filters;
+      const next: NormalizedFilters = { ...filters };
 
-    const next = { ...filters };
+      (Object.entries(lockedFilterValues) as [keyof FilterState, string | boolean | undefined][]).forEach(
+        ([key, value]) => {
+          if (value !== undefined) {
+            next[key] = value as NormalizedFilters[typeof key];
+          }
+        }
+      );
 
-    for (const key of lockedKeys) {
-      const value = (lockedFilterValues as Partial<FilterState>)[key];
-      if (value !== undefined) {
-        (next as any)[key] = value;
-      }
-    }
-
-    return next;
-  },
-  [lockedFilterValues, lockedKeys]
-);
-
-
-  const startingFilters = useMemo(
-    () => mergeLockedFilters(normalizeFilters({ ...initialFilters, ...(lockedFilterValues ?? {}) })),
-    [initialFilters, lockedFilterValues, mergeLockedFilters]
+      return next;
+    },
+    [lockedFilterValues]
   );
+
+  const parseSearchParams = useCallback(
+    (params: ReturnType<typeof useSearchParams>): ParsedSearchParams => {
+      const hasPageParam = params?.has("page") ?? false;
+      const hasPageSizeParam = params?.has("pageSize") ?? false;
+
+      const parsedPage = Number(params?.get("page") ?? "");
+      const parsedPageSize = Number(params?.get("pageSize") ?? "");
+
+      const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+      const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : DEFAULT_PAGE_SIZE;
+
+      const filters = normalizeFilters({
+        query: params?.get("keyword") ?? "",
+        category: params?.get("category") ?? "",
+        state: params?.get("state") ?? "",
+        agency: params?.get("agency") ?? "",
+        hasApplyLink: params?.get("has_apply_link") === "1",
+      });
+
+      return { filters, page, pageSize, hasPageParam, hasPageSizeParam };
+    },
+    []
+  );
+
+  const initialUrlState = useMemo(() => parseSearchParams(searchParams), [parseSearchParams, searchParams]);
+
+  const startingFilters = useMemo(() => {
+    const combinedFilters = normalizeFilters({
+      ...initialFilters,
+      ...(initialUrlState?.filters ?? {}),
+    });
+
+    return mergeLockedFilters(combinedFilters);
+  }, [initialFilters, initialUrlState?.filters, mergeLockedFilters]);
+
+  const startingPage = useMemo(() => {
+    if (initialUrlState?.hasPageParam) return initialUrlState.page;
+    if (typeof initialFilters.page === "number") return initialFilters.page;
+    if (typeof initialResults.page === "number") return initialResults.page;
+    return 1;
+  }, [initialFilters.page, initialResults.page, initialUrlState?.hasPageParam, initialUrlState?.page]);
+
+  const startingPageSize = useMemo(() => {
+    if (initialUrlState?.hasPageSizeParam) return initialUrlState.pageSize;
+    if (typeof initialFilters.pageSize === "number") return initialFilters.pageSize;
+    if (typeof initialResults.pageSize === "number") return initialResults.pageSize;
+    return DEFAULT_PAGE_SIZE;
+  }, [initialFilters.pageSize, initialResults.pageSize, initialUrlState?.hasPageSizeParam, initialUrlState?.pageSize]);
 
   const [appliedFilters, setAppliedFilters] = useState<NormalizedFilters>(startingFilters);
   const [results, setResults] = useState<Grant[]>(initialResults.grants);
   const [total, setTotal] = useState(initialResults.total);
-  const [page, setPage] = useState(initialResults.page || initialFilters.page || 1);
-  const [pageSize, setPageSize] = useState(initialResults.pageSize || initialFilters.pageSize || DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(startingPage);
+  const [pageSize, setPageSize] = useState(startingPageSize);
   const [totalPages, setTotalPages] = useState(initialResults.totalPages || 0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +203,7 @@ const mergeLockedFilters = useCallback(
         includeDefaults: false,
         additionalParams,
       });
+
       router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
     },
     [additionalParams, pathname, router]
@@ -178,17 +213,18 @@ const mergeLockedFilters = useCallback(
    * API SEARCH
    -----------------------------*/
   const performSearch = useCallback(
-    async (filters: NormalizedFilters, nextPage: number) => {
+    async (filters: NormalizedFilters, nextPage: number, nextPageSize?: number) => {
       const effectiveFilters = mergeLockedFilters(filters);
-      const nextPageSize = pageSize || DEFAULT_PAGE_SIZE;
+      const resolvedPageSize = nextPageSize ?? pageSize ?? DEFAULT_PAGE_SIZE;
 
-      updateUrl(effectiveFilters, nextPage, nextPageSize);
+      updateUrl(effectiveFilters, nextPage, resolvedPageSize);
 
+      setAppliedFilters(effectiveFilters);
       setIsLoading(true);
       setError(null);
 
       try {
-        const requestParams = serializeFilters(effectiveFilters, nextPage, nextPageSize, {
+        const requestParams = serializeFilters(effectiveFilters, nextPage, resolvedPageSize, {
           includeDefaults: true,
           additionalParams,
         });
@@ -207,8 +243,6 @@ const mergeLockedFilters = useCallback(
         setPage(data.page);
         setPageSize(data.pageSize);
         setTotalPages(data.totalPages);
-        setAppliedFilters(effectiveFilters);
-
       } catch (err) {
         console.error(err);
         setResults([]);
@@ -224,25 +258,20 @@ const mergeLockedFilters = useCallback(
    * URL → FILTERBAR SYNC
    -----------------------------*/
   useEffect(() => {
-    if (!searchParams) return;
+    const parsed = parseSearchParams(searchParams);
+    const mergedFilters = mergeLockedFilters(parsed.filters);
 
-    const urlFilters: NormalizedFilters = normalizeFilters({
-      query: searchParams.get("keyword") ?? "",
-      category: searchParams.get("category") ?? "",
-      state: searchParams.get("state") ?? "",
-      agency: searchParams.get("agency") ?? "",
-      hasApplyLink: searchParams.get("has_apply_link") === "1",
-    });
+    const filtersChanged = !areFiltersEqual(mergedFilters, appliedFilters);
+    const paginationChanged = parsed.page !== page || parsed.pageSize !== pageSize;
 
-    const merged = mergeLockedFilters(urlFilters);
-
-    const nextPage = Number(searchParams.get("page") ?? 1);
-
-    if (!areFiltersEqual(merged, appliedFilters)) {
-      setAppliedFilters(merged);
-      void performSearch(merged, nextPage);
+    if (filtersChanged) {
+      setAppliedFilters(mergedFilters);
     }
-  }, [searchParams, mergeLockedFilters, appliedFilters, performSearch]);
+
+    if (filtersChanged || paginationChanged) {
+      void performSearch(mergedFilters, parsed.page, parsed.pageSize);
+    }
+  }, [appliedFilters, mergeLockedFilters, page, pageSize, parseSearchParams, performSearch, searchParams]);
 
   /** FILTERBAR CHANGE HANDLING */
   const handleFiltersChange = useCallback(
@@ -250,22 +279,24 @@ const mergeLockedFilters = useCallback(
       const normalized = mergeLockedFilters(normalizeFilters(next));
       const targetPage = 1;
 
-      if (context.reason === "submit" ||
-          context.reason === "change" ||
-          context.reason === "debounced") {
+      if (
+        context.reason === "submit" ||
+        context.reason === "change" ||
+        context.reason === "debounced"
+      ) {
         if (areFiltersEqual(normalized, appliedFilters) && targetPage === page) return;
-        void performSearch(normalized, targetPage);
+        void performSearch(normalized, targetPage, pageSize);
       }
     },
-    [appliedFilters, mergeLockedFilters, page, performSearch]
+    [appliedFilters, mergeLockedFilters, page, pageSize, performSearch]
   );
 
   const handlePageChange = useCallback(
     (nextPage: number) => {
       if (nextPage === page) return;
-      void performSearch(appliedFilters, nextPage);
+      void performSearch(appliedFilters, nextPage, pageSize);
     },
-    [appliedFilters, page, performSearch]
+    [appliedFilters, page, pageSize, performSearch]
   );
 
   const hasResults = results.length > 0;
@@ -308,9 +339,9 @@ const mergeLockedFilters = useCallback(
             </div>
           )}
 
-          {!isLoading && !error && hasResults &&
-            results.map((grant) => <GrantCard key={grant.id} grant={grant} />)
-          }
+          {!isLoading && !error &&
+            hasResults &&
+            results.map((grant) => <GrantCard key={grant.id} grant={grant} />)}
 
           {!isLoading && !error && !hasResults && (
             <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm">

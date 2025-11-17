@@ -3,6 +3,12 @@ import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantCard } from "@/components/grants/grant-card";
 import { Pagination } from "@/components/grants/pagination";
 import { RelatedLinks } from "@/components/grants/related-links";
+import {
+  resolveRouteParams,
+  resolveSearchParams,
+  extractSearchParam,
+  type SearchParamsLike,
+} from "@/app/grants/_components/route-params";
 import { resolveStateParam } from "@/lib/grant-location";
 import { wordsFromSlug } from "@/lib/strings";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
@@ -23,16 +29,20 @@ export async function generateMetadata({
   params,
   searchParams,
 }: {
-  params: Promise<{ stateCode: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  params: { stateCode: string } | Promise<{ stateCode: string }>;
+  searchParams?:
+    | URLSearchParams
+    | Record<string, string | string[] | undefined>
+    | Promise<URLSearchParams | Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const resolvedSearch = searchParams ? await searchParams : {};
+  const resolvedParams = await resolveRouteParams(params, "state.metadata");
+  const resolvedSearch = (await resolveSearchParams(searchParams, "state.metadata")) as
+    | SearchParamsLike
+    | undefined;
 
-  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+  const stateInfo = resolveStateParam(resolvedParams?.stateCode);
 
-  const rawCategory =
-    typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
+  const rawCategory = extractSearchParam(resolvedSearch, "category");
 
   const category = formatCategory(rawCategory);
 
@@ -54,19 +64,26 @@ export default async function StateGrantsPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ stateCode: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  params: { stateCode: string } | Promise<{ stateCode: string }>;
+  searchParams?:
+    | URLSearchParams
+    | Record<string, string | string[] | undefined>
+    | Promise<URLSearchParams | Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedParams = await params;
-  const resolvedSearch = searchParams ? await searchParams : {};
+  const resolvedParams = await resolveRouteParams(params, "state.page");
+  const resolvedSearch = (await resolveSearchParams(searchParams, "state.page")) as
+    | SearchParamsLike
+    | undefined;
 
-  const stateInfo = resolveStateParam(resolvedParams.stateCode);
+  const stateInfo = resolveStateParam(resolvedParams?.stateCode);
 
-  const page = safeNumber(resolvedSearch?.page, 1);
-  const pageSize = Math.min(50, safeNumber(resolvedSearch?.pageSize, PAGE_SIZE));
+  const page = safeNumber(extractSearchParam(resolvedSearch, "page") ?? undefined, 1);
+  const pageSize = Math.min(
+    50,
+    safeNumber(extractSearchParam(resolvedSearch, "pageSize") ?? undefined, PAGE_SIZE)
+  );
 
-  const rawCategory =
-    typeof resolvedSearch?.category === "string" ? resolvedSearch.category : undefined;
+  const rawCategory = extractSearchParam(resolvedSearch, "category");
 
   const category = formatCategory(rawCategory);
 

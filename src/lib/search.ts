@@ -3,14 +3,16 @@ import { agencySlugCandidates, escapeIlike } from "@/lib/agency";
 import {
   FEDERAL_STATE_LABELS,
   STATEWIDE_CITY_LABELS,
+  findStateInfo,
   inferGrantLocation,
+  isFederalStateValue,
   normalizeStateCode,
   stateNameCandidatesFromCode,
 } from "@/lib/grant-location";
 import { deriveAgencySlug } from "@/lib/slug";
-import { slugify } from "@/lib/strings";
+import { slugify, wordsFromSlug } from "@/lib/strings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { FacetSets, Grant, GrantFilters } from "@/lib/types";
+import type { FacetSets, FilterFacet, Grant, GrantFilters } from "@/lib/types";
 
 const TABLE_FALLBACK_ORDER: readonly string[] = ["grants"];
 
@@ -70,7 +72,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       ? filters.agencyCode.trim()
       : undefined;
 
-  const stateCode = normalizeStateCode(filters.stateCode ?? undefined);
+  const stateCode = normalizeStateCode(filters.stateCode ?? filters.state ?? undefined);
   const hasApplyLink = filters.hasApplyLink === true;
 
   const stateLower = rawStateFilter.toLowerCase();
@@ -179,12 +181,12 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     /** State filter */
     if (stateCode && hasStateColumn) {
-      const candidateClauses = stateNameCandidatesFromCode(stateCode).map(
-        (candidate) => `state.ilike.%${escapeIlike(candidate)}%`
-      );
-      const clauses = candidateClauses.length
-        ? candidateClauses
-        : [`state.ilike.%${escapeIlike(stateCode)}%`];
+      const candidates = new Set<string>([stateCode, ...stateNameCandidatesFromCode(stateCode)]);
+      const clauses = Array.from(candidates).map((candidate) => {
+        const sanitized = escapeIlike(candidate);
+        return `state.ilike.%${sanitized}%`;
+      });
+
       console.log("🌎 Matching state code candidates", { table, stateCode, clauses });
       q = q.or(clauses.join(","));
     } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
@@ -234,7 +236,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     /** Jurisdiction filters */
     if (jurisdiction === "federal" && hasStateColumn) {
-     
+
       const orClauses = ["state.is.null", "state.eq.''"];
       for (const label of FEDERAL_STATE_LABELS) {
         const sanitizedLabel = escapeIlike(label);
@@ -243,8 +245,16 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       console.log("🏛️ Applying federal jurisdiction filter", { table, clauses: orClauses });
       q = q.or(orClauses.join(","));
     } else if (jurisdiction === "state" && hasCityColumn) {
-     console.log("🗺️ Applying state jurisdiction filter (no city restriction)", { table });
-     
+      const statewideCityClauses = ["city.is.null", "city.eq.''"];
+      for (const label of STATEWIDE_CITY_LABELS) {
+        statewideCityClauses.push(`city.ilike.%${escapeIlike(label)}%`);
+      }
+
+      console.log("🗺️ Applying state jurisdiction filter (statewide + unspecified cities)", {
+        table,
+        clauses: statewideCityClauses,
+      });
+      q = q.or(statewideCityClauses.join(","));
     } else if (jurisdiction === "local" && hasCityColumn) {
       console.log("🏘️ Applying local jurisdiction filter", { table });
       q = q.not("city", "is", null).not("city", "eq", "");
@@ -389,19 +399,47 @@ export async function getFacetSets(): Promise<FacetSets> {
 
   const f: FacetSets = { categories: [], states: [], agencies: [] };
 
-  const clean = (vals: (string | null)[]) =>
-    [...new Set(vals.filter((v): v is string => !!v && v.trim().length > 0))].sort();
+  const toStateFacet = (state: string, count: number): FilterFacet | null => {
+    const trimmed = state.trim();
+    if (!trimmed) return null;
+
+    const info = findStateInfo(trimmed);
+    const slugLabel = wordsFromSlug(slugify(trimmed) ?? trimmed) || trimmed;
+    const label = info?.name ?? slugLabel;
+    const value = info?.code ?? trimmed;
+
+    if (!label || !value) return null;
+    return { label, value, grantCount: count };
+  };
+
+  const ensureFederalFacet = async (existing: FilterFacet[]): Promise<FilterFacet[]> => {
+    const hasFederal = existing.some((facet) => isFederalStateValue(facet.label));
+    if (hasFederal) return existing;
+
+    const federalClauses = ["state.is.null", "state.eq.''"];
+    for (const label of FEDERAL_STATE_LABELS) {
+      federalClauses.push(`state.ilike.%${escapeIlike(label)}%`);
+    }
+
+    const { count } = await supabase
+      .from("grants")
+      .select("id", { count: "exact", head: true })
+      .or(federalClauses.join(","));
+
+    const federalFacet: FilterFacet = {
+      label: "Federal (nationwide)",
+      value: "Federal (nationwide)",
+      grantCount: count ?? 0,
+    };
+
+    return [federalFacet, ...existing];
+  };
 
   try {
     const [cat, st, ag] = await Promise.all([
-<<<<<<< HEAD
       supabase.rpc("categories_with_counts"),
-      supabase.from("grants").select("state").limit(200),
-=======
-      supabase.from("grant_categories").select("category_label").limit(500),
-      supabase.from("grants").select("state").limit(500),
->>>>>>> dff3295 (updating state page path and filters)
-      supabase.from("grants").select("agency").limit(500),
+      supabase.from("grants").select("state, count:id", { head: false }).group("state"),
+      supabase.from("grants").select("agency, count:id", { head: false }).group("agency"),
     ]);
 
     const { data: categoryData, error: categoryError } = cat as unknown as {
@@ -420,7 +458,7 @@ export async function getFacetSets(): Promise<FacetSets> {
             typeof item?.category_label === "string" &&
             item.category_label.trim().length > 0 &&
             typeof item?.grant_count === "number" &&
-            item.grant_count > 0,
+            item?.grant_count > 0,
         )
         .map((item) => ({
           slug: item.slug.trim(),
@@ -431,43 +469,77 @@ export async function getFacetSets(): Promise<FacetSets> {
         .slice(0, 100);
     }
 
-<<<<<<< HEAD
     if (st.error || ag.error) {
       console.error("❌ facet query failed", st.error || ag.error);
       return f;
     }
-=======
-    // categories (unchanged)
-    f.categories = clean(cat.data.map((x) => x.category_label)).slice(0, 50);
->>>>>>> dff3295 (updating state page path and filters)
 
-    // states: normalize → dedupe → sort
-    const rawStates = clean(st.data.map((x) => x.state));
+    const states = Array.isArray(st.data)
+      ? (st.data
+          .map((entry: any) => {
+            if (typeof entry?.state !== "string") return null;
+            const countValue = typeof entry?.count === "number" ? entry.count : Number(entry?.count ?? 0);
+            const count = Number.isFinite(countValue) ? countValue : 0;
+            return toStateFacet(entry.state, count);
+          })
+          .filter((facet): facet is FilterFacet => Boolean(facet)) as FilterFacet[])
+      : [];
 
-    const normalized = rawStates
-      .map((s) => normalizeStateCode(s) ?? s)
-      .map((s) =>
-        typeof s === "string" && s.length === 2 ? s : s.trim()
-      );
+    const stateAccumulator = new Map<string, FilterFacet>();
+    for (const facet of states) {
+      const existing = stateAccumulator.get(facet.value);
+      if (existing) {
+        existing.grantCount += facet.grantCount;
+      } else {
+        stateAccumulator.set(facet.value, { ...facet });
+      }
+    }
 
-    const uniqueStates = [...new Set(normalized)].sort();
+    const agencies = Array.isArray(ag.data)
+      ? (ag.data
+          .map((entry: any) => {
+            const label = typeof entry?.agency === "string" ? entry.agency.trim() : "";
+            const countValue = typeof entry?.count === "number" ? entry.count : Number(entry?.count ?? 0);
+            const count = Number.isFinite(countValue) ? countValue : 0;
+            if (!label) return null;
+            return { label, value: label, grantCount: count } satisfies FilterFacet;
+          })
+          .filter((facet): facet is FilterFacet => Boolean(facet)) as FilterFacet[])
+      : [];
 
-    const hasFederal = uniqueStates.some((s) =>
-      s.toLowerCase().includes("federal") ||
-      s.toLowerCase().includes("nationwide")
-    );
+    const agencyAccumulator = new Map<string, FilterFacet>();
+    for (const facet of agencies) {
+      const existing = agencyAccumulator.get(facet.value);
+      if (existing) {
+        existing.grantCount += facet.grantCount;
+      } else {
+        agencyAccumulator.set(facet.value, { ...facet });
+      }
+    }
 
-    f.states = hasFederal
-      ? uniqueStates
-      : ["Federal (nationwide)", ...uniqueStates];
+    const dedupedStates = Array.from(stateAccumulator.values());
+    const sortedStates = dedupedStates.sort((a, b) => a.label.localeCompare(b.label));
+    const dedupedAgencies = Array.from(agencyAccumulator.values());
+    const sortedAgencies = dedupedAgencies
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+      .slice(0, 150);
 
-    f.agencies = clean(ag.data.map((x: any) => x.agency)).slice(0, 50);
-
+    const withFederal = await ensureFederalFacet(sortedStates);
+    f.states = withFederal.sort((a, b) => a.label.localeCompare(b.label));
+    f.agencies = sortedAgencies;
   } catch (err) {
     console.error("❌ Error loading facets:", err);
   }
 
-  if (f.states.length === 0) f.states = ["Federal (nationwide)"];
+  if (f.states.length === 0) {
+    f.states = [
+      {
+        label: "Federal (nationwide)",
+        value: "Federal (nationwide)",
+        grantCount: 0,
+      },
+    ];
+  }
 
   return f;
 }

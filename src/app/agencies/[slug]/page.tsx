@@ -161,8 +161,14 @@ const agency = await resolveAgency(slugParam, "agency.page");
     label: `${item.label} (${item.grantCount})`,
     value: item.slug,
   }));
-  const stateOptions: FilterOption[] = facets.states.map((value) => ({ label: value, value }));
-  const agencyOptions: FilterOption[] = facets.agencies.map((value) => ({ label: value, value }));
+  const stateOptions: FilterOption[] = facets.states.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
+  const agencyOptions: FilterOption[] = facets.agencies.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },

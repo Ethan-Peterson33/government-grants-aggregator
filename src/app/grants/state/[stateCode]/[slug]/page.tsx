@@ -144,6 +144,7 @@ export default async function StateGrantDetailPage({
   return (
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
+      
       <GrantDetail grant={grant} />
 
       {relatedGrants.length > 0 && (

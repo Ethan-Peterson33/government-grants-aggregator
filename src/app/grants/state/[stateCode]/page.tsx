@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
+
 import { Breadcrumb } from "@/components/grants/breadcrumb";
-import { GrantCard } from "@/components/grants/grant-card";
-import { Pagination } from "@/components/grants/pagination";
-import { RelatedLinks } from "@/components/grants/related-links";
+import type { FilterOption } from "@/components/grants/filters-bar";
+import { GrantsSearchClient } from "@/components/grants/grants-search-client";
+
 import {
   resolveRouteParams,
   resolveSearchParams,
   extractSearchParam,
   type SearchParamsLike,
 } from "@/app/grants/_components/route-params";
+
 import { resolveStateParam } from "@/lib/grant-location";
 import { wordsFromSlug } from "@/lib/strings";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
-import { safeNumber, searchGrants } from "@/lib/search";
-import type { Grant } from "@/lib/types";
+
+import { safeNumber, searchGrants, getFacetSets } from "@/lib/search";
+import type { GrantFilters } from "@/lib/types";
 
 const PAGE_SIZE = 12;
 
@@ -22,9 +25,9 @@ function formatCategory(value: string | undefined): string | undefined {
   return wordsFromSlug(value.toLowerCase().replace(/\s+/g, "-"));
 }
 
-/** -------------------------------------------
- *  FIXED generateMetadata — unwrap params/searchParams
- * ------------------------------------------ */
+/* --------------------------
+   METADATA
+--------------------------- */
 export async function generateMetadata({
   params,
   searchParams,
@@ -41,9 +44,7 @@ export async function generateMetadata({
     | undefined;
 
   const stateInfo = resolveStateParam(resolvedParams?.stateCode);
-
   const rawCategory = extractSearchParam(resolvedSearch, "category");
-
   const category = formatCategory(rawCategory);
 
   const title = category
@@ -51,15 +52,15 @@ export async function generateMetadata({
     : `${stateInfo.name} Statewide Grants`;
 
   const description = category
-    ? `Explore ${category.toLowerCase()} funding available to organizations across ${stateInfo.name}.`
+    ? `Explore ${category.toLowerCase()} funding available across ${stateInfo.name}.`
     : `Discover statewide grant programs supporting communities throughout ${stateInfo.name}.`;
 
   return { title, description };
 }
 
-/** -------------------------------------------
- *  FIXED default export — unwrap params/searchParams
- * ------------------------------------------ */
+/* --------------------------
+   PAGE
+--------------------------- */
 export default async function StateGrantsPage({
   params,
   searchParams,
@@ -77,6 +78,9 @@ export default async function StateGrantsPage({
 
   const stateInfo = resolveStateParam(resolvedParams?.stateCode);
 
+  /* --------------------------
+      Resolve URL params
+  --------------------------- */
   const page = safeNumber(extractSearchParam(resolvedSearch, "page") ?? undefined, 1);
   const pageSize = Math.min(
     50,
@@ -84,21 +88,45 @@ export default async function StateGrantsPage({
   );
 
   const rawCategory = extractSearchParam(resolvedSearch, "category");
-
   const category = formatCategory(rawCategory);
 
-  /** -------------------------------------------
-   *  FIX: Always pass stateCode (postal code) to searchGrants
-   * ------------------------------------------ */
-  const { grants, total } = await searchGrants({
-    stateCode: stateInfo.code, // ⬅️ VA, TX, CA…
-    state: stateInfo.name,     // ⬅️ "Virginia" (fallback local match)
-    category,
-    jurisdiction: "state",
+  /* --------------------------
+      Construct filters for initial SSR request
+  --------------------------- */
+  const filters: GrantFilters = {
     page,
     pageSize,
-  });
+    state: stateInfo.name,
+    stateCode: stateInfo.code,
+    category,
+    jurisdiction: "state",
+  };
 
+  const [{ grants, total, totalPages }, facets] = await Promise.all([
+    searchGrants(filters),
+    getFacetSets(),
+  ]);
+
+  /* --------------------------
+      Build filter options
+  --------------------------- */
+  const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
+    label: `${item.label} (${item.grantCount})`,
+    value: item.slug,
+  }));
+
+  const stateOptions: FilterOption[] = [
+    { label: stateInfo.name, value: stateInfo.code },
+  ];
+
+  const agencyOptions: FilterOption[] = facets.agencies.map((a) => ({
+    label: `${a.label} (${a.grantCount})`,
+    value: a.value,
+  }));
+
+  /* --------------------------
+      Breadcrumbs
+  --------------------------- */
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Grants", href: "/grants" },
@@ -106,21 +134,6 @@ export default async function StateGrantsPage({
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
-  const hasResults = grants.length > 0;
-
-  const relatedLinks = [
-    { label: "Federal programs", href: "/grants/federal" },
-    {
-      label: `Search all ${stateInfo.code} funding`,
-      href: `/grants?state=${encodeURIComponent(stateInfo.code)}`
-    },
-    category
-      ? {
-          label: `More ${category.toLowerCase()} grants`,
-          href: `/grants/state/${stateInfo.code}?category=${encodeURIComponent(category)}`,
-        }
-      : null,
-  ].filter(Boolean) as { label: string; href: string }[];
 
   return (
     <div className="container-grid space-y-6 py-10">
@@ -133,34 +146,42 @@ export default async function StateGrantsPage({
             : `${stateInfo.name} statewide grants`}
         </h1>
         <p className="text-slate-600">
-          Review active funding initiatives supporting communities across {stateInfo.name}.
-          Filter by category to focus on programs that align with your mission.
+          Explore active funding opportunities throughout {stateInfo.name}.
         </p>
       </header>
 
-      <section className="space-y-4">
-        <div className="space-y-4">
-          {hasResults ? (
-            grants.map((grant: Grant) => <GrantCard key={grant.id} grant={grant} />)
-          ) : (
-            <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm text-slate-600">
-              <p>No statewide grants match these filters right now. Try another category or check back soon.</p>
-            </div>
-          )}
-        </div>
-
-        {hasResults && (
-          <Pagination
-            total={total}
-            pageSize={pageSize}
-            currentPage={page}
-            basePath={`/grants/state/${stateInfo.code}`}
-            rawCategory={rawCategory}
-          />
-        )}
-      </section>
-
-      <RelatedLinks links={relatedLinks} />
+      {/* --------------------------
+           FILTER + CLIENT SEARCH
+      --------------------------- */}
+      <GrantsSearchClient
+        initialFilters={{
+          query: "",
+          category: category ?? "",
+          state: stateInfo.code,          // default to the state (Behavior D)
+          agency: "",
+          hasApplyLink: false,
+          page,
+          pageSize,
+        }}
+        initialResults={{
+          grants,
+          total,
+          page,
+          pageSize,
+          totalPages,
+        }}
+        categories={categoryOptions}
+        states={stateOptions}
+        agencies={agencyOptions}
+        lockedFilters={{
+          state: stateInfo.code,          // Behavior D: default AND locked
+        }}
+        staticParams={{
+          jurisdiction: "state",
+          stateCode: stateInfo.code,
+        }}
+        showStateFilter={false}           // State is locked, hide selector
+      />
 
       <script
         type="application/ld+json"

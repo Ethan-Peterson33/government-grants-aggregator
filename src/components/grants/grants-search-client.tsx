@@ -19,7 +19,7 @@ import type { Grant } from "@/lib/types";
 
 const DEFAULT_PAGE_SIZE = 12;
 
-type LockedAgency = {
+export type LockedAgency = {
   label: string;
   slug: string;
   code?: string | null | undefined;
@@ -39,24 +39,35 @@ export type GrantsSearchClientProps = {
 
 type NormalizedFilters = FilterState;
 
-type ParsedSearchParams = {
-  filters: NormalizedFilters;
-  page: number;
-  pageSize: number;
-  hasPageParam: boolean;
-  hasPageSizeParam: boolean;
-};
-
-const normalizeFilters = (filters: Partial<FilterState>): NormalizedFilters => {
-  const resolvedState = resolveStateQueryValue(filters.state);
+const normalizeFilters = (raw: Partial<FilterState>): NormalizedFilters => {
+  const resolvedState = resolveStateQueryValue(raw.state);
 
   return {
-    query: filters.query?.trim() ?? "",
-    category: filters.category?.trim() ?? "",
-    state: resolvedState.value || filters.state?.trim() || "",
-    agency: filters.agency?.trim() ?? "",
-    hasApplyLink: Boolean(filters.hasApplyLink),
+    query: (raw.query ?? "").trim(),
+    category: (raw.category ?? "").trim(),
+    state: resolvedState.value || (raw.state ?? "").trim(),
+    agency: (raw.agency ?? "").trim(),
+    hasApplyLink: Boolean(raw.hasApplyLink),
   };
+};
+
+const applyLocked = (
+  filters: NormalizedFilters,
+  locked?: Partial<FilterState>
+): NormalizedFilters => {
+  if (!locked) return filters;
+
+  const lockedNorm = normalizeFilters(locked);
+  const out = { ...filters };
+
+  for (const key of Object.keys(lockedNorm) as (keyof FilterState)[]) {
+    const val = lockedNorm[key];
+    if (val !== undefined && val !== "") {
+      out[key] = val;
+    }
+  }
+
+  return out;
 };
 
 const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
@@ -66,35 +77,39 @@ const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
   a.agency === b.agency &&
   a.hasApplyLink === b.hasApplyLink;
 
-export const serializeFilters = (
+const serializeFilters = (
   filters: NormalizedFilters,
   page: number,
   pageSize: number,
-  options: { includeDefaults?: boolean; additionalParams?: Record<string, string | undefined> } = {}
+  opts?: {
+    additionalParams?: Record<string, string>;
+    locked?: Partial<FilterState>;
+  }
 ): URLSearchParams => {
-  const params = new URLSearchParams();
+  const p = new URLSearchParams();
 
-  if (filters.query.trim()) params.set("keyword", filters.query.trim());
-  if (filters.category) params.set("category", filters.category);
-  if (filters.state) params.set("state", filters.state);
-  if (filters.agency) params.set("agency", filters.agency);
-  if (filters.hasApplyLink) params.set("has_apply_link", "1");
+  const { additionalParams, locked } = opts ?? {};
 
-  if (options.includeDefaults) {
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
-  } else {
-    if (page > 1) params.set("page", String(page));
-    if (pageSize !== DEFAULT_PAGE_SIZE) params.set("pageSize", String(pageSize));
+  /** Only write category if it is *not* locked */
+  if (!(locked?.category) && filters.category) {
+    p.set("category", filters.category);
   }
 
-  if (options.additionalParams) {
-    for (const [key, value] of Object.entries(options.additionalParams)) {
-      if (value?.trim()) params.set(key, value.trim());
+  if (filters.query) p.set("keyword", filters.query);
+  if (filters.state) p.set("state", filters.state);
+  if (filters.agency) p.set("agency", filters.agency);
+  if (filters.hasApplyLink) p.set("has_apply_link", "1");
+
+  if (page > 1) p.set("page", `${page}`);
+  if (pageSize !== DEFAULT_PAGE_SIZE) p.set("pageSize", `${pageSize}`);
+
+  if (additionalParams) {
+    for (const [k, v] of Object.entries(additionalParams)) {
+      if (v) p.set(k, v);
     }
   }
 
-  return params;
+  return p;
 };
 
 export function GrantsSearchClient({
@@ -112,97 +127,91 @@ export function GrantsSearchClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  /** LOCKED AGENCY HANDLING */
-  const lockedFilterValues = useMemo<Partial<FilterState> | undefined>(() => {
-    const merged: Partial<FilterState> = { ...(lockedFilters ?? {}) };
+  /** --------------------------
+   * LOCKED FILTER MERGING
+   --------------------------- */
+  const lockedFilterValues = useMemo(() => {
+    const merged = { ...(lockedFilters ?? {}) };
 
     if (lockedAgency) {
       merged.agency = lockedAgency.label;
     }
 
-    return Object.keys(merged).length > 0 ? merged : undefined;
+    return Object.keys(merged).length ? merged : undefined;
   }, [lockedAgency, lockedFilters]);
 
-  const mergeLockedFilters = useCallback(
-    (filters: NormalizedFilters): NormalizedFilters => {
-      if (!lockedFilterValues) return filters;
-
-      const locked = normalizeFilters(lockedFilterValues);
-      const next: NormalizedFilters = { ...filters };
-      const writable = next as Record<keyof FilterState, NormalizedFilters[keyof FilterState]>;
-
-      (Object.keys(locked) as (keyof FilterState)[]).forEach((key) => {
-        const value = locked[key];
-        if (value !== undefined) {
-          writable[key] = value;
-        }
-      });
-
-      return next;
-    },
+  const mergeLocked = useCallback(
+    (filters: NormalizedFilters) =>
+      lockedFilterValues ? applyLocked(filters, lockedFilterValues) : filters,
     [lockedFilterValues]
   );
 
-  const parseSearchParams = useCallback(
-    (params: ReturnType<typeof useSearchParams>): ParsedSearchParams => {
-      const hasPageParam = params?.has("page") ?? false;
-      const hasPageSizeParam = params?.has("pageSize") ?? false;
-
-      const parsedPage = Number(params?.get("page") ?? "");
-      const parsedPageSize = Number(params?.get("pageSize") ?? "");
-
-      const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-      const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? parsedPageSize : DEFAULT_PAGE_SIZE;
-
-      const stateQueryValue = resolveStateQueryValue(params?.get("state") ?? undefined).value;
-
-      const filters = normalizeFilters({
-        query: params?.get("keyword") ?? params?.get("query") ?? "",
-        category: params?.get("category") ?? "",
-        state: stateQueryValue ?? "",
-        agency: params?.get("agency") ?? "",
-        hasApplyLink: params?.get("has_apply_link") === "1",
+  /** --------------------------
+   * URL → INTERNAL STATE PARSE
+   --------------------------- */
+  const parseUrl = useCallback(
+    (sp: URLSearchParams) => {
+      const raw = normalizeFilters({
+        query: sp.get("keyword") ?? sp.get("query") ?? "",
+        category: sp.get("category") ?? "",
+        state: sp.get("state") ?? "",
+        agency: sp.get("agency") ?? "",
+        hasApplyLink: sp.get("has_apply_link") === "1",
       });
 
-      return { filters, page, pageSize, hasPageParam, hasPageSizeParam };
+      const lockedApplied = mergeLocked(raw);
+
+      return {
+        filters: lockedApplied,
+        page: Number(sp.get("page")) || 1,
+        pageSize: Number(sp.get("pageSize")) || DEFAULT_PAGE_SIZE,
+      };
     },
-    []
+    [mergeLocked]
   );
 
-  const initialUrlState = useMemo(() => parseSearchParams(searchParams), [parseSearchParams, searchParams]);
+  const initialUrlState = useMemo(() => parseUrl(searchParams), []);
 
-  const startingFilters = useMemo(() => {
-    const combinedFilters = normalizeFilters({
+  /** --------------------------
+   * INITIAL FILTERS
+   --------------------------- */
+  const startingFilters = applyLocked(
+    normalizeFilters({
       ...initialFilters,
-      ...(initialUrlState?.filters ?? {}),
-    });
+      ...initialUrlState.filters,
+    }),
+    lockedFilterValues
+  );
 
-    return mergeLockedFilters(combinedFilters);
-  }, [initialFilters, initialUrlState?.filters, mergeLockedFilters]);
+  const startingPage =
+    initialUrlState.page ??
+    initialFilters.page ??
+    initialResults.page ??
+    1;
 
-  const startingPage = useMemo(() => {
-    if (initialUrlState?.hasPageParam) return initialUrlState.page;
-    if (typeof initialFilters.page === "number") return initialFilters.page;
-    if (typeof initialResults.page === "number") return initialResults.page;
-    return 1;
-  }, [initialFilters.page, initialResults.page, initialUrlState?.hasPageParam, initialUrlState?.page]);
+  const startingPageSize =
+    initialUrlState.pageSize ??
+    initialFilters.pageSize ??
+    initialResults.pageSize ??
+    DEFAULT_PAGE_SIZE;
 
-  const startingPageSize = useMemo(() => {
-    if (initialUrlState?.hasPageSizeParam) return initialUrlState.pageSize;
-    if (typeof initialFilters.pageSize === "number") return initialFilters.pageSize;
-    if (typeof initialResults.pageSize === "number") return initialResults.pageSize;
-    return DEFAULT_PAGE_SIZE;
-  }, [initialFilters.pageSize, initialResults.pageSize, initialUrlState?.hasPageSizeParam, initialUrlState?.pageSize]);
-
-  const [appliedFilters, setAppliedFilters] = useState<NormalizedFilters>(startingFilters);
-  const [results, setResults] = useState<Grant[]>(initialResults.grants);
+  /** --------------------------
+   * LOCAL STATE
+   --------------------------- */
+  const [filters, setFilters] = useState<NormalizedFilters>(startingFilters);
+  const [results, setResults] = useState(initialResults.grants);
   const [total, setTotal] = useState(initialResults.total);
   const [page, setPage] = useState(startingPage);
   const [pageSize, setPageSize] = useState(startingPageSize);
-  const [totalPages, setTotalPages] = useState(initialResults.totalPages || 0);
+  const [totalPages, setTotalPages] = useState(
+    initialResults.totalPages ?? 0
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** --------------------------
+   * STATIC PARAMS → URL
+   --------------------------- */
   const additionalParams = useMemo(() => {
     const extra: Record<string, string> = {};
 
@@ -212,65 +221,66 @@ export function GrantsSearchClient({
     }
 
     if (staticParams) {
-      for (const [key, value] of Object.entries(staticParams)) {
-        if (typeof value === "string") {
-          extra[key] = value;
-        }
+      for (const [k, v] of Object.entries(staticParams)) {
+        if (v) extra[k] = v;
       }
     }
 
-    return Object.keys(extra).length > 0 ? extra : undefined;
+    return Object.keys(extra).length ? extra : undefined;
   }, [lockedAgency, staticParams]);
 
-  /** ----------------------------
-   * URL UPDATE
-   -----------------------------*/
+  /** --------------------------
+   * UPDATE URL
+   --------------------------- */
   const updateUrl = useCallback(
-    (filters: NormalizedFilters, nextPage: number, nextPageSize: number) => {
-      const params = serializeFilters(filters, nextPage, nextPageSize, {
-        includeDefaults: false,
+    (f: NormalizedFilters, page: number, size: number) => {
+      const sp = serializeFilters(f, page, size, {
         additionalParams,
+        locked: lockedFilterValues,
       });
-      router.replace(params.toString() ? `${pathname}?${params}` : pathname, { scroll: false });
+
+      router.replace(
+        sp.toString() ? `${pathname}?${sp}` : pathname,
+        {
+          scroll: false,
+        }
+      );
     },
-    [additionalParams, pathname, router]
+    [pathname, router, additionalParams, lockedFilterValues]
   );
 
-  /** ----------------------------
-   * API SEARCH
-   -----------------------------*/
+  /** --------------------------
+   * PERFORM SEARCH
+   --------------------------- */
   const performSearch = useCallback(
     async (
-      filters: NormalizedFilters,
+      nextFilters: NormalizedFilters,
       nextPage: number,
       nextPageSize?: number,
-      options?: { skipUrlUpdate?: boolean }
+      opts?: { skipUrl?: boolean }
     ) => {
-      const effectiveFilters = mergeLockedFilters(filters);
-      const resolvedPageSize = nextPageSize ?? pageSize ?? DEFAULT_PAGE_SIZE;
+      const size = nextPageSize ?? pageSize;
+      const effective = mergeLocked(nextFilters);
 
-      if (!options?.skipUrlUpdate) {
-        updateUrl(effectiveFilters, nextPage, resolvedPageSize);
+      if (!opts?.skipUrl) {
+        updateUrl(effective, nextPage, size);
       }
 
-      setAppliedFilters(effectiveFilters);
+      setFilters(effective);
       setIsLoading(true);
       setError(null);
 
       try {
-        const requestParams = serializeFilters(effectiveFilters, nextPage, resolvedPageSize, {
-          includeDefaults: true,
+        const sp = serializeFilters(effective, nextPage, size, {
           additionalParams,
+          locked: lockedFilterValues,
         });
 
-        const response = await fetch(`/api/grants/search?${requestParams.toString()}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
+        const res = await fetch(`/api/grants/search?${sp}`);
 
-        if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+        if (!res.ok) throw new Error("Search failed");
 
-        const data: SearchResult = await response.json();
+        const data: SearchResult = await res.json();
 
         setResults(data.grants);
         setTotal(data.total);
@@ -285,67 +295,83 @@ export function GrantsSearchClient({
         setIsLoading(false);
       }
     },
-    [additionalParams, mergeLockedFilters, pageSize, updateUrl]
+    [
+      additionalParams,
+      mergeLocked,
+      pageSize,
+      updateUrl,
+      lockedFilterValues,
+    ]
   );
 
-  /** ----------------------------
-   * URL → FILTERBAR SYNC
-   -----------------------------*/
+  /** --------------------------
+   * SYNC URL → STATE
+   --------------------------- */
   useEffect(() => {
-    const parsed = parseSearchParams(searchParams);
-    const mergedFilters = mergeLockedFilters(parsed.filters);
+    const parsed = parseUrl(searchParams);
 
-    const filtersChanged = !areFiltersEqual(mergedFilters, appliedFilters);
-    const paginationChanged = parsed.page !== page || parsed.pageSize !== pageSize;
+    const filtersChanged = !areFiltersEqual(parsed.filters, filters);
+    const pageChanged =
+      parsed.page !== page || parsed.pageSize !== pageSize;
 
-    if (filtersChanged) {
-      setAppliedFilters(mergedFilters);
+    if (filtersChanged || pageChanged) {
+      performSearch(parsed.filters, parsed.page, parsed.pageSize, {
+        skipUrl: true,
+      });
+    }
+  }, [searchParams]);
+
+  /** --------------------------
+   * FILTERBAR CHANGE
+   --------------------------- */
+const handleFiltersChange = useCallback(
+  (next: FilterState, ctx: FiltersBarChangeContext) => {
+    const normalized = mergeLocked(normalizeFilters(next));
+
+    // Auto-reset to page defaults when filters are completely empty
+    const isEmpty =
+      !normalized.query &&
+      !normalized.category &&
+      !normalized.state &&
+      !normalized.agency &&
+      !normalized.hasApplyLink;
+
+    if (isEmpty && lockedFilterValues) {
+      const reset = applyLocked(normalizeFilters({}), lockedFilterValues);
+      performSearch(reset, 1, pageSize);
+      return;
     }
 
-    if (filtersChanged || paginationChanged) {
-      void performSearch(mergedFilters, parsed.page, parsed.pageSize, { skipUrlUpdate: true });
-    }
-  }, [appliedFilters, mergeLockedFilters, page, pageSize, parseSearchParams, performSearch, searchParams]);
+    // Normal behavior
+    if (areFiltersEqual(normalized, filters) && page === 1) return;
 
-  /** FILTERBAR CHANGE HANDLING */
-  const handleFiltersChange = useCallback(
-    (next: FilterState, context: FiltersBarChangeContext) => {
-      const normalized = mergeLockedFilters(normalizeFilters(next));
-      const targetPage = 1;
+    performSearch(normalized, 1, pageSize);
+  },
+  [filters, page, pageSize, mergeLocked, lockedFilterValues]
+);
 
-      if (
-        context.reason === "submit" ||
-        context.reason === "change" ||
-        context.reason === "debounced"
-      ) {
-        if (areFiltersEqual(normalized, appliedFilters) && targetPage === page) return;
-        void performSearch(normalized, targetPage, pageSize);
-      }
-    },
-    [appliedFilters, mergeLockedFilters, page, pageSize, performSearch]
-  );
 
   const handlePageChange = useCallback(
-    (nextPage: number) => {
-      if (nextPage === page) return;
-      void performSearch(appliedFilters, nextPage, pageSize);
+    (p: number) => {
+      if (p === page) return;
+      performSearch(filters, p, pageSize);
     },
-    [appliedFilters, page, pageSize, performSearch]
+    [filters, page, pageSize]
   );
 
   const hasResults = results.length > 0;
   const showPagination = hasResults && totalPages > 1;
+
   const jurisdictionParam = searchParams.get("jurisdiction")?.toLowerCase();
   const effectiveShowStateFilter =
-    showStateFilter && jurisdictionParam !== "private" && staticParams?.jurisdiction !== "private";
+    showStateFilter &&
+    jurisdictionParam !== "private" &&
+    staticParams?.jurisdiction !== "private";
 
-  /** ----------------------------
-   * RENDER
-   -----------------------------*/
   return (
     <div className="space-y-6">
       <FiltersBar
-        filters={appliedFilters}
+        filters={filters}
         categories={categories}
         states={states}
         agencies={agencies}
@@ -364,9 +390,23 @@ export function GrantsSearchClient({
           {isLoading && (
             <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-10">
               <span className="sr-only">Loading…</span>
-              <svg className="h-6 w-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              <svg
+                className="h-6 w-6 animate-spin text-blue-600"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  className="opacity-25"
+                />
+                <path
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  className="opacity-75"
+                />
               </svg>
             </div>
           )}
@@ -377,9 +417,10 @@ export function GrantsSearchClient({
             </div>
           )}
 
-          {!isLoading && !error &&
+          {!isLoading &&
+            !error &&
             hasResults &&
-            results.map((grant) => <GrantCard key={grant.id} grant={grant} />)}
+            results.map((g) => <GrantCard key={g.id} grant={g} />)}
 
           {!isLoading && !error && !hasResults && (
             <div className="rounded-lg border border-dashed border-slate-200 p-10 text-center text-sm">

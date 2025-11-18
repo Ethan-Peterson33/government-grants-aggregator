@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+
 import { Input } from "@/components/ui/input";
 
 export type FilterOption = {
@@ -17,7 +25,7 @@ export type FilterState = {
 };
 
 export type FiltersBarChangeContext = {
-  reason: "submit" | "change" | "debounced";
+  reason: "submit" | "change" | "debounced" | "reset";
 };
 
 type FiltersBarProps = {
@@ -26,72 +34,26 @@ type FiltersBarProps = {
   states?: FilterOption[];
   agencies?: FilterOption[];
   isLoading?: boolean;
+
+  /** Locked means "cannot change" but still applied */
   lockedFilters?: Partial<FilterState>;
+
+  /** Whether state dropdown should show */
   showStateFilter?: boolean;
-  onFiltersChange?: (next: FilterState, context: FiltersBarChangeContext) => void;
+
+  onFiltersChange?: (next: FilterState, ctx: FiltersBarChangeContext) => void;
 };
 
-/** Full 50-state fallback if backend hasn’t loaded states yet */
-const DEFAULT_STATE_OPTIONS: FilterOption[] = [
-  { label: "Federal (nationwide)", value: "Federal (nationwide)" },
-  { label: "Alabama", value: "AL" },
-  { label: "Alaska", value: "AK" },
-  { label: "Arizona", value: "AZ" },
-  { label: "Arkansas", value: "AR" },
-  { label: "California", value: "CA" },
-  { label: "Colorado", value: "CO" },
-  { label: "Connecticut", value: "CT" },
-  { label: "Delaware", value: "DE" },
-  { label: "Florida", value: "FL" },
-  { label: "Georgia", value: "GA" },
-  { label: "Hawaii", value: "HI" },
-  { label: "Idaho", value: "ID" },
-  { label: "Illinois", value: "IL" },
-  { label: "Indiana", value: "IN" },
-  { label: "Iowa", value: "IA" },
-  { label: "Kansas", value: "KS" },
-  { label: "Kentucky", value: "KY" },
-  { label: "Louisiana", value: "LA" },
-  { label: "Maine", value: "ME" },
-  { label: "Maryland", value: "MD" },
-  { label: "Massachusetts", value: "MA" },
-  { label: "Michigan", value: "MI" },
-  { label: "Minnesota", value: "MN" },
-  { label: "Mississippi", value: "MS" },
-  { label: "Missouri", value: "MO" },
-  { label: "Montana", value: "MT" },
-  { label: "Nebraska", value: "NE" },
-  { label: "Nevada", value: "NV" },
-  { label: "New Hampshire", value: "NH" },
-  { label: "New Jersey", value: "NJ" },
-  { label: "New Mexico", value: "NM" },
-  { label: "New York", value: "NY" },
-  { label: "North Carolina", value: "NC" },
-  { label: "North Dakota", value: "ND" },
-  { label: "Ohio", value: "OH" },
-  { label: "Oklahoma", value: "OK" },
-  { label: "Oregon", value: "OR" },
-  { label: "Pennsylvania", value: "PA" },
-  { label: "Rhode Island", value: "RI" },
-  { label: "South Carolina", value: "SC" },
-  { label: "South Dakota", value: "SD" },
-  { label: "Tennessee", value: "TN" },
-  { label: "Texas", value: "TX" },
-  { label: "Utah", value: "UT" },
-  { label: "Vermont", value: "VT" },
-  { label: "Virginia", value: "VA" },
-  { label: "Washington", value: "WA" },
-  { label: "West Virginia", value: "WV" },
-  { label: "Wisconsin", value: "WI" },
-  { label: "Wyoming", value: "WY" },
-];
+/* ------------------------------------------------------------------
+   Helpers
+------------------------------------------------------------------- */
 
 const normalizeFilters = (filters?: Partial<FilterState>): FilterState => ({
   query: filters?.query ?? "",
   category: filters?.category ?? "",
   state: filters?.state ?? "",
   agency: filters?.agency ?? "",
-  hasApplyLink: Boolean(filters?.hasApplyLink),
+  hasApplyLink: Boolean(filters?.hasApplyLink ?? false),
 });
 
 const areFiltersEqual = (a: FilterState, b: FilterState) =>
@@ -105,19 +67,17 @@ const computeLockedValues = (locked?: Partial<FilterState>) => {
   if (!locked) return { map: undefined, keys: new Set<keyof FilterState>() };
 
   const keys = new Set(Object.keys(locked) as (keyof FilterState)[]);
-  if (keys.size === 0) return { map: undefined, keys };
-
   const normalized = normalizeFilters(locked);
-  const map: Partial<FilterState> = {};
 
-  const writable = map as Record<keyof FilterState, FilterState[keyof FilterState]>;
-  keys.forEach((key) => {
-    writable[key] = normalized[key];
-  });
+  const map: Partial<FilterState> = {};
+  for (const k of keys) map[k] = normalized[k];
 
   return { map, keys };
 };
 
+/* ------------------------------------------------------------------
+   Component
+------------------------------------------------------------------- */
 export function FiltersBar({
   filters,
   categories = [],
@@ -130,43 +90,35 @@ export function FiltersBar({
 }: FiltersBarProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Normalize state options (ensure unique, valid)
-  const stateOptions = useMemo(
-    () =>
-      states.length > 0
-        ? states.filter(
-            (s) =>
-              s &&
-              typeof s.value === "string" &&
-              s.value.trim().length > 0
-          )
-        : DEFAULT_STATE_OPTIONS,
-    [states]
-  );
-
   const locked = useMemo(() => computeLockedValues(lockedFilters), [lockedFilters]);
 
+  /* Initial normalized + locked override */
   const normalizedFilters = useMemo(() => {
-    const base = normalizeFilters(filters);
+    const f = normalizeFilters(filters);
+
+    // Apply locked values on top
     if (locked.map) {
       for (const key of locked.keys) {
-        const value = locked.map[key];
-        if (typeof value === "boolean" || typeof value === "string") {
-          (base as any)[key] = value;
+        const val = locked.map[key];
+        if (typeof val !== "undefined") {
+          (f as any)[key] = val;
         }
       }
     }
-    return base;
+
+    return f;
   }, [filters, locked]);
 
   const [filterState, setFilterState] = useState<FilterState>(normalizedFilters);
 
+  /* Keep filterState synced with external changes */
   useEffect(() => {
-    setFilterState((current) =>
-      areFiltersEqual(current, normalizedFilters) ? current : normalizedFilters
+    setFilterState((prev) =>
+      areFiltersEqual(prev, normalizedFilters) ? prev : normalizedFilters
     );
   }, [normalizedFilters]);
 
+  /* Debounce clear on unmount */
   useEffect(
     () => () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -174,49 +126,105 @@ export function FiltersBar({
     []
   );
 
-  const notify = (next: FilterState, reason: FiltersBarChangeContext["reason"]) => {
+  /* Notify callback */
+  const notify = (
+    next: FilterState,
+    reason: FiltersBarChangeContext["reason"]
+  ) => {
+    if (locked.map) {
+      for (const key of locked.keys) {
+        next[key] = locked.map[key]!;
+      }
+    }
     onFiltersChange?.(next, { reason });
   };
 
-  const handleQueryChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setFilterState((current) => {
-      const next = { ...current, query: value };
+  /* ------------------------------------------
+     INPUT HANDLERS
+  ------------------------------------------- */
+
+  const handleQueryChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    setFilterState((prev) => {
+      const next = { ...prev, query: value };
+
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => notify(next, "debounced"), 400);
+
+      debounceRef.current = setTimeout(() => {
+        notify(next, "debounced");
+      }, 700);
+
       return next;
     });
   };
 
   const handleSelectChange =
-    (key: keyof FilterState) => (event: ChangeEvent<HTMLSelectElement>) => {
-      const value = event.target.value;
-      setFilterState((current) => {
-        if (locked.keys.has(key)) return current;
-        const next = { ...current, [key]: value } as FilterState;
+    (key: keyof FilterState) => (e: ChangeEvent<HTMLSelectElement>) => {
+      if (locked.keys.has(key)) return; // cannot change locked filter
+
+      const value = e.target.value;
+
+      setFilterState((prev) => {
+        const next = { ...prev, [key]: value } as FilterState;
         notify(next, "change");
         return next;
       });
     };
 
-  const handleCheckboxChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const checked = event.target.checked;
-    setFilterState((current) => {
-      if (locked.keys.has("hasApplyLink")) return current;
-      const next = { ...current, hasApplyLink: checked };
+  const handleCheckboxChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (locked.keys.has("hasApplyLink")) return;
+
+    const checked = e.target.checked;
+
+    setFilterState((prev) => {
+      const next = { ...prev, hasApplyLink: checked };
       notify(next, "change");
       return next;
     });
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const next = normalizeFilters(filterState);
+
+    // Apply locked overlays
+    if (locked.map) {
+      for (const key of locked.keys) {
+        next[key] = locked.map[key]!;
+      }
+    }
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    notify(filterState, "submit");
+
+    notify(next, "submit");
   };
+
+  /* ------------------------------------------
+     RESET / CLEAR BEHAVIOR (Behavior D)
+  ------------------------------------------- */
+
+  const handleReset = () => {
+    const next = normalizeFilters({});
+
+    // Reset brings back locked defaults
+    if (locked.map) {
+      for (const key of locked.keys) {
+        next[key] = locked.map[key]!;
+      }
+    }
+
+    setFilterState(next);
+    notify(next, "reset");
+  };
+
+  /* ------------------------------------------
+     RENDER
+  ------------------------------------------- */
 
   return (
     <form
@@ -226,7 +234,10 @@ export function FiltersBar({
     >
       {/* Keyword */}
       <div className="w-full space-y-1 sm:flex-1 sm:max-w-md">
-        <label htmlFor="search" className="text-xs font-semibold uppercase text-slate-500">
+        <label
+          htmlFor="search"
+          className="text-xs font-semibold uppercase text-slate-500"
+        >
           Keyword
         </label>
         <Input
@@ -239,25 +250,21 @@ export function FiltersBar({
       </div>
 
       {/* Category */}
-      {categories.length > 0 && (
+      {!!categories.length && (
         <div className="w-full space-y-1 sm:w-48">
-          <label
-            htmlFor="category"
-            className="text-xs font-semibold uppercase text-slate-500"
-          >
+          <label className="text-xs font-semibold uppercase text-slate-500">
             Category
           </label>
           <select
-            id="category"
             value={filterState.category}
             onChange={handleSelectChange("category")}
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
             disabled={isLoading || locked.keys.has("category")}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
           >
             <option value="">All categories</option>
-            {categories.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {categories.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
               </option>
             ))}
           </select>
@@ -267,20 +274,19 @@ export function FiltersBar({
       {/* State */}
       {showStateFilter && (
         <div className="w-full space-y-1 sm:w-48">
-          <label htmlFor="state" className="text-xs font-semibold uppercase text-slate-500">
+          <label className="text-xs font-semibold uppercase text-slate-500">
             State
           </label>
           <select
-            id="state"
             value={filterState.state}
             onChange={handleSelectChange("state")}
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
             disabled={isLoading || locked.keys.has("state")}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
           >
             <option value="">All states</option>
-            {stateOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {states.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
@@ -288,29 +294,28 @@ export function FiltersBar({
       )}
 
       {/* Agency */}
-      {agencies.length > 0 && (
+      {!!agencies.length && (
         <div className="w-full space-y-1 sm:w-56">
-          <label htmlFor="agency" className="text-xs font-semibold uppercase text-slate-500">
+          <label className="text-xs font-semibold uppercase text-slate-500">
             Agency
           </label>
           <select
-            id="agency"
             value={filterState.agency}
             onChange={handleSelectChange("agency")}
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
             disabled={isLoading || locked.keys.has("agency")}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
           >
             <option value="">All agencies</option>
-            {agencies.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {agencies.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
               </option>
             ))}
           </select>
         </div>
       )}
 
-      {/* Has apply link */}
+      {/* Apply Link */}
       <label className="flex items-center gap-2 text-sm text-slate-600">
         <input
           type="checkbox"
@@ -321,6 +326,15 @@ export function FiltersBar({
         />
         Has apply link
       </label>
+
+      {/* Reset Button */}
+      <button
+        type="button"
+        onClick={handleReset}
+        className="rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-700 hover:bg-slate-200"
+      >
+        Reset
+      </button>
     </form>
   );
 }

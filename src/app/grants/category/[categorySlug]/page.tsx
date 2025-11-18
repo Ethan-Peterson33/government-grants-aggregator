@@ -53,18 +53,21 @@ export default async function CategoryGrantsPage({
   const categorySlug = resolvedParams.categorySlug;
   const categoryLabel = normalizeCategory(categorySlug);
 
-  const filters: GrantFilters = {
-    page,
-    pageSize,
-    query,
-    category: categorySlug,
-    state,
-    stateCode: resolvedState.code,
-    agency,
-    hasApplyLink,
-    jurisdiction,
-  };
-
+const filters =  {
+  page,
+  pageSize,
+  query,
+ category:
+  typeof resolvedSearchParams?.category === "string" &&
+  resolvedSearchParams.category.trim() !== ""
+    ? resolvedSearchParams.category
+    : categorySlug,
+  state,
+  stateCode: resolvedState.code,
+  agency,
+  hasApplyLink,
+  jurisdiction,
+};
   const [{ grants, total, totalPages }, facets] = await Promise.all([
     searchGrants(filters),
     getFacetSets(),
@@ -115,7 +118,7 @@ export default async function CategoryGrantsPage({
         categories={categoryOptions}
         states={stateOptions}
         agencies={agencyOptions}
-        lockedFilters={{ category: categorySlug }}
+         lockedFilters={undefined}
       />
 
       <script

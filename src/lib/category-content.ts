@@ -19,7 +19,7 @@ export const CATEGORY_CONTENT: Record<string, CategoryContentBlock> = {
       "Arts and cultural funding helps support artists, museums, arts organizations, festivals, and creative community development.",
     body:
       "Programs may include operational support, project grants, touring assistance, community arts initiatives, and cultural preservation funding. Applicants can find grants from federal organizations such as the National Endowment for the Arts, state arts councils, local city programs, and private foundations committed to creative placemaking and cultural enrichment."
-  },
+  }, 
 
   // Add as many categories as you want...
   // use the slug as the key.

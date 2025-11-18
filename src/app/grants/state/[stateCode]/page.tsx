@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import type { FilterOption } from "@/components/grants/filters-bar";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
-
+import { stateGrantContent } from "@/lib/state-content";
 import {
   resolveRouteParams,
   resolveSearchParams,
@@ -77,7 +77,7 @@ export default async function StateGrantsPage({
     | undefined;
 
   const stateInfo = resolveStateParam(resolvedParams?.stateCode);
-
+  const stateSeoContent = stateGrantContent[stateInfo.code];
   /* --------------------------
       Resolve URL params
   --------------------------- */
@@ -149,7 +149,22 @@ export default async function StateGrantsPage({
           Explore active funding opportunities throughout {stateInfo.name}.
         </p>
       </header>
+{/* ---- NEW STATIC CONTENT BLOCK ---- */}
+{stateSeoContent && (
+  <section className="prose prose-slate max-w-none py-4">
+    {stateSeoContent.heading && (
+      <h2 className="text-2xl font-semibold">{stateSeoContent.heading}</h2>
+    )}
 
+    {stateSeoContent.intro && (
+      <p className="text-slate-700">{stateSeoContent.intro}</p>
+    )}
+
+    {stateSeoContent.body && (
+      <p className="text-slate-700">{stateSeoContent.body}</p>
+    )}
+  </section>
+)}
       {/* --------------------------
            FILTER + CLIENT SEARCH
       --------------------------- */}

@@ -8,8 +8,11 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
-
 import { Input } from "@/components/ui/input";
+
+/* -------------------------------------------
+   Types
+------------------------------------------- */
 
 export type FilterOption = {
   label: string;
@@ -35,18 +38,15 @@ type FiltersBarProps = {
   agencies?: FilterOption[];
   isLoading?: boolean;
 
-  /** Locked means "cannot change" but still applied */
   lockedFilters?: Partial<FilterState>;
-
-  /** Whether state dropdown should show */
   showStateFilter?: boolean;
 
   onFiltersChange?: (next: FilterState, ctx: FiltersBarChangeContext) => void;
 };
 
-/* ------------------------------------------------------------------
+/* -------------------------------------------
    Helpers
-------------------------------------------------------------------- */
+------------------------------------------- */
 
 const normalizeFilters = (filters?: Partial<FilterState>): FilterState => ({
   query: filters?.query ?? "",
@@ -66,18 +66,25 @@ const areFiltersEqual = (a: FilterState, b: FilterState) =>
 const computeLockedValues = (locked?: Partial<FilterState>) => {
   if (!locked) return { map: undefined, keys: new Set<keyof FilterState>() };
 
-  const keys = new Set(Object.keys(locked) as (keyof FilterState)[]);
-  const normalized = normalizeFilters(locked);
+  // 💡 MUST ALLOW undefined because Partial<T> produces it
+  const map: { [key in keyof FilterState]?: string | boolean } = {};
+  const keys = new Set<keyof FilterState>();
 
-  const map: Partial<FilterState> = {};
-  for (const k of keys) map[k] = normalized[k];
+  for (const key of Object.keys(locked) as (keyof FilterState)[]) {
+    const val = locked[key];
+    if (val !== undefined) {
+      keys.add(key);
+      map[key] = val; // ✅ Now always valid
+    }
+  }
 
   return { map, keys };
 };
 
-/* ------------------------------------------------------------------
+/* -------------------------------------------
    Component
-------------------------------------------------------------------- */
+------------------------------------------- */
+
 export function FiltersBar({
   filters,
   categories = [],
@@ -92,55 +99,57 @@ export function FiltersBar({
 
   const locked = useMemo(() => computeLockedValues(lockedFilters), [lockedFilters]);
 
-  /* Initial normalized + locked override */
+  /* Normalize + apply locked values */
   const normalizedFilters = useMemo(() => {
     const f = normalizeFilters(filters);
 
-    // Apply locked values on top
     if (locked.map) {
       for (const key of locked.keys) {
-        const val = locked.map[key];
-        if (typeof val !== "undefined") {
-          (f as any)[key] = val;
+        const v = locked.map[key];
+        if (v !== undefined) {
+          (f as Record<keyof FilterState, FilterState[keyof FilterState]>)[key] = v;
         }
       }
     }
-
     return f;
   }, [filters, locked]);
 
   const [filterState, setFilterState] = useState<FilterState>(normalizedFilters);
 
-  /* Keep filterState synced with external changes */
+  /* Sync external changes */
   useEffect(() => {
     setFilterState((prev) =>
       areFiltersEqual(prev, normalizedFilters) ? prev : normalizedFilters
     );
   }, [normalizedFilters]);
 
-  /* Debounce clear on unmount */
-  useEffect(
-    () => () => {
+  /* Cleanup */
+  useEffect(() => {
+    return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-    },
-    []
-  );
+    };
+  }, []);
 
-  /* Notify callback */
+  /* -------------------------------------------
+     NOTIFY (with locked overrides)
+  ------------------------------------------- */
   const notify = (
     next: FilterState,
     reason: FiltersBarChangeContext["reason"]
   ) => {
     if (locked.map) {
       for (const key of locked.keys) {
-        next[key] = locked.map[key]!;
+        const v = locked.map[key];
+        if (v !== undefined) {
+          (next as Record<keyof FilterState, FilterState[keyof FilterState]>)[key] = v;
+        }
       }
     }
     onFiltersChange?.(next, { reason });
   };
 
-  /* ------------------------------------------
-     INPUT HANDLERS
+  /* -------------------------------------------
+     Handlers
   ------------------------------------------- */
 
   const handleQueryChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -161,12 +170,12 @@ export function FiltersBar({
 
   const handleSelectChange =
     (key: keyof FilterState) => (e: ChangeEvent<HTMLSelectElement>) => {
-      if (locked.keys.has(key)) return; // cannot change locked filter
+      if (locked.keys.has(key)) return;
 
       const value = e.target.value;
 
       setFilterState((prev) => {
-        const next = { ...prev, [key]: value } as FilterState;
+        const next = { ...prev, [key]: value };
         notify(next, "change");
         return next;
       });
@@ -186,13 +195,14 @@ export function FiltersBar({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     const next = normalizeFilters(filterState);
 
-    // Apply locked overlays
     if (locked.map) {
       for (const key of locked.keys) {
-        next[key] = locked.map[key]!;
+        const v = locked.map[key];
+        if (v !== undefined) {
+          (next as Record<keyof FilterState, FilterState[keyof FilterState]>)[key] = v;
+        }
       }
     }
 
@@ -204,17 +214,15 @@ export function FiltersBar({
     notify(next, "submit");
   };
 
-  /* ------------------------------------------
-     RESET / CLEAR BEHAVIOR (Behavior D)
-  ------------------------------------------- */
-
   const handleReset = () => {
     const next = normalizeFilters({});
 
-    // Reset brings back locked defaults
     if (locked.map) {
       for (const key of locked.keys) {
-        next[key] = locked.map[key]!;
+        const v = locked.map[key];
+        if (v !== undefined) {
+          (next as Record<keyof FilterState, FilterState[keyof FilterState]>)[key] = v;
+        }
       }
     }
 
@@ -222,8 +230,8 @@ export function FiltersBar({
     notify(next, "reset");
   };
 
-  /* ------------------------------------------
-     RENDER
+  /* -------------------------------------------
+     Render
   ------------------------------------------- */
 
   return (
@@ -327,7 +335,7 @@ export function FiltersBar({
         Has apply link
       </label>
 
-      {/* Reset Button */}
+      {/* Reset */}
       <button
         type="button"
         onClick={handleReset}

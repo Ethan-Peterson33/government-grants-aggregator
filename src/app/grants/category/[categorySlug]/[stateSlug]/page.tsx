@@ -135,6 +135,7 @@ export async function generateMetadata({ params }: { params: Params | Promise<Pa
 
   const ogImageUrl = `https://www.grantdirectory.org/images/${context.stateSlug}-grants.jpg`;
 
+  
   return {
     title,
     description,

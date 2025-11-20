@@ -123,9 +123,8 @@ export async function generateMetadata({ params }: { params: Params | Promise<Pa
 
   const { copy, categoryLabel } = buildCopy(context);
 
-  const title =
-    copy?.seoTitle ??
-    `${categoryLabel} Grants in ${context.state.name} | GrantDirectory.org`;
+  const defaultTitle = `${context.state.name} ${categoryLabel} Grants | GrantDirectory.org`;
+  const title = copy?.seoTitle ?? defaultTitle;
 
   const description =
     copy?.seoDescription ??
@@ -154,7 +153,7 @@ export async function generateMetadata({ params }: { params: Params | Promise<Pa
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: `${context.state.name} ${categoryLabel} grants`,
+          alt: `${context.state.name} ${categoryLabel} Grants`,
         },
       ],
     },

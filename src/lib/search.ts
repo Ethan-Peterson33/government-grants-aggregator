@@ -96,7 +96,14 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   if (shouldFilterByCategory) {
     const slugFilters = Array.from(
       new Set(
-        [slugCandidate, rawCategoryFilter.toLowerCase()]
+        [
+          slugCandidate,
+          rawCategoryFilter.toLowerCase(),
+          // FTHB category records are stored as "first-time-homeowner" but the UI can
+          // generate a slug with a trailing "-grants". Include a suffix-stripped
+          // variant so the Supabase lookup still resolves to category_code = "FTHB".
+          slugCandidate.replace(/-grants?$/, ""),
+        ]
           .map((value) => value.trim())
           .filter((value) => value.length > 0),
       ),

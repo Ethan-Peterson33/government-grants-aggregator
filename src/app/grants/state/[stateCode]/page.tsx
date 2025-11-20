@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
+import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import type { FilterOption } from "@/components/grants/filters-bar";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
+import { digitalProducts } from "@/config/digital-products";
 import { stateGrantContent } from "@/lib/state-content";
 import {
   resolveRouteParams,
@@ -134,6 +136,9 @@ export default async function StateGrantsPage({
   ];
 
   const itemListJsonLd = generateItemListJsonLd(grants);
+  const homebuyerProduct = digitalProducts.find(
+    (product) => product.category === "homebuyer"
+  );
 
   return (
     <div className="container-grid space-y-6 py-10">
@@ -197,6 +202,34 @@ export default async function StateGrantsPage({
         }}
         showStateFilter={false}           // State is locked, hide selector
       />
+
+      {homebuyerProduct ? (
+        <section className="mt-6 space-y-3 border-t border-slate-200 pt-6">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold text-slate-900">
+              First-time homebuyer? Start with this guide.
+            </h2>
+            <p className="text-sm text-slate-700">
+              This downloadable workbook walks you through grants, timelines, and checklists so you can buy with confidence in
+              {" "}
+              {stateInfo.name}.
+            </p>
+          </div>
+          <AffiliateOfferCard
+            offer={{
+              title: homebuyerProduct.name,
+              description: homebuyerProduct.shortDescription,
+              href: `/resources/${homebuyerProduct.slug}`,
+              cta: "View details",
+              secondaryHref: homebuyerProduct.lemonSqueezyUrl,
+              secondaryCta: "Buy now",
+              tags: homebuyerProduct.tags,
+              color: "blue",
+              secondaryExternal: true,
+            }}
+          />
+        </section>
+      ) : null}
 
       <script
         type="application/ld+json"

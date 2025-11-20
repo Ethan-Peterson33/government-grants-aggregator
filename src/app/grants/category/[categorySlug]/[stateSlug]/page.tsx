@@ -123,12 +123,48 @@ export async function generateMetadata({ params }: { params: Params | Promise<Pa
   const { copy, categoryLabel } = buildCopy(context);
 
   const title =
-    copy?.seoTitle ?? `${categoryLabel} Grants in ${context.state.name} | GrantDirectory.org`;
-  const description =
-    copy?.seoDescription ?? `Browse ${categoryLabel.toLowerCase()} grants available in ${context.state.name}, including state and local programs.`;
+    copy?.seoTitle ??
+    `${categoryLabel} Grants in ${context.state.name} | GrantDirectory.org`;
 
-  return { title, description };
+  const description =
+    copy?.seoDescription ??
+    `Browse ${categoryLabel.toLowerCase()} grants available in ${context.state.name}, including state and local programs.`;
+
+  const canonical = `https://www.grantdirectory.org/grants/category/${context.category.slug}/${context.stateSlug}`;
+
+  const ogImageUrl = `https://www.grantdirectory.org/images/${context.stateSlug}-grants.jpg`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: "Grant Directory",
+      type: "article",
+      locale: "en_US",
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: `${context.state.name} ${categoryLabel} grants`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImageUrl],
+    },
+  };
 }
+
 
 export default async function CategoryStatePage({ params }: { params: Params | Promise<Params> }) {
   const resolvedParams = await resolveRouteParams(params, "category-state.page");

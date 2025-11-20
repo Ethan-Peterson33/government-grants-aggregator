@@ -305,6 +305,15 @@ export default async function GrantsIndexPage({
                     Local community funding
                   </Link>
                 </li>
+                <li>
+                  {/* Ensure first-time homebuyer category is discoverable alongside other program types */}
+                  <Link
+                    href="/grants/category/first-time-homeowner"
+                    className="text-blue-700 hover:text-blue-900"
+                  >
+                    First-time homebuyer grants
+                  </Link>
+                </li>
               </ul>
             </div>
           </section>
@@ -342,6 +351,18 @@ export default async function GrantsIndexPage({
               </Link>
               <p className="text-slate-500 text-xs mt-1">
                 Explore private and government programs that support charitable missions.
+              </p>
+            </li>
+
+            <li>
+              <Link
+                href="/grants/category/first-time-homeowner"
+                className="text-blue-700 font-medium hover:text-blue-900 transition"
+              >
+                First-time homebuyer grants
+              </Link>
+              <p className="text-slate-500 text-xs mt-1">
+                Browse programs supporting new homeowners, including down payment assistance.
               </p>
             </li>
           </ul>

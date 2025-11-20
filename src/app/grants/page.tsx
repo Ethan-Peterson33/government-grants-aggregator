@@ -136,7 +136,7 @@ export default async function GrantsIndexPage({
     primaryState && primaryState.value !== state
       ? {
           label: `Funding in ${primaryState.label}`,
-          href: `/grants?state=${slugify(primaryState.value)}`,
+          href: `/grants/state/${slugify(primaryState.value) ?? primaryState.value}`,
         }
       : null,
     primaryAgency && primaryAgency.value !== agency
@@ -194,11 +194,11 @@ export default async function GrantsIndexPage({
                 Federal grants overview
               </Link>
               {randomState && (
-                <Link
-                  href={`/grants?state=${slugify(randomState.value)}`}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-                >
-                  Funding in {randomState.label}
+              <Link
+                href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+              >
+                Funding in {randomState.label}
                 </Link>
               )}
               {randomCategory && (
@@ -263,7 +263,7 @@ export default async function GrantsIndexPage({
                 {randomState && (
                   <li key={randomState.value}>
                     <Link
-                      href={`/grants?state=${slugify(randomState.value)}`}
+                      href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
                       className="text-blue-700 hover:text-blue-900"
                     >
                       Funding in {randomState.label}

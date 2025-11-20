@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
@@ -12,6 +13,7 @@ import {
   type MaybePromise,
   type SearchParamsLike,
 } from "@/app/grants/_components/route-params";
+import { digitalProducts } from "@/config/digital-products";
 import { resolveStateParam } from "@/lib/grant-location";
 import { inferGrantLocation } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
@@ -140,11 +142,12 @@ export default async function StateGrantDetailPage({
   ];
 
   const grantJsonLd = generateGrantJsonLd(grant, { path: canonical });
+  const homebuyerProduct = digitalProducts.find((product) => product.category === "homebuyer");
 
   return (
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
-      
+
       <GrantDetail grant={grant} />
 
       {relatedGrants.length > 0 && (
@@ -162,6 +165,31 @@ export default async function StateGrantDetailPage({
           </div>
         </section>
       )}
+
+      {homebuyerProduct ? (
+        <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold text-slate-900">First-time homebuyer? Start with this guide.</h2>
+            <p className="text-sm text-slate-700">
+              This downloadable workbook walks you through grants, timelines, and checklists so you can buy with confidence in {" "}
+              {stateInfo.name}.
+            </p>
+          </div>
+          <AffiliateOfferCard
+            offer={{
+              title: homebuyerProduct.name,
+              description: homebuyerProduct.shortDescription,
+              href: `/resources/${homebuyerProduct.slug}`,
+              cta: "View details",
+              secondaryHref: homebuyerProduct.lemonSqueezyUrl,
+              secondaryCta: "Buy now",
+              tags: homebuyerProduct.tags,
+              color: "blue",
+              secondaryExternal: true,
+            }}
+          />
+        </section>
+      ) : null}
 
       <RelatedLinks links={relatedLinks} />
 

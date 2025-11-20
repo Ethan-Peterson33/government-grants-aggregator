@@ -5,6 +5,7 @@ import { GrantCard } from "@/components/grants/grant-card";
 import { GrantDetail } from "@/components/grants/grant-detail";
 import { RelatedLinks } from "@/components/grants/related-links";
 import { loadGrant } from "@/app/grants/_components/load-grant";
+import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 import {
   extractSearchParam,
   resolveRouteParams,
@@ -18,6 +19,7 @@ import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
 import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
+import { findDigitalProductByCategorySlug } from "@/config/digital-products";
 
 type StateParams = { stateCode: string; slug: string };
 
@@ -140,12 +142,29 @@ export default async function StateGrantDetailPage({
   ];
 
   const grantJsonLd = generateGrantJsonLd(grant, { path: canonical });
+  const categorySlug = grant.grant_categories?.slug ?? grant.category ?? undefined;
+  const digitalProduct = findDigitalProductByCategorySlug(categorySlug);
 
   return (
     <div className="container-grid space-y-10 py-10">
       <Breadcrumb items={breadcrumbItems} />
-      
+
       <GrantDetail grant={grant} />
+
+      {digitalProduct ? (
+        <AffiliateOfferCard
+          offer={{
+            title: digitalProduct.name,
+            description: digitalProduct.shortDescription,
+            href: `/resources/${digitalProduct.slug}`,
+            cta: "View digital guide",
+            secondaryHref: digitalProduct.lemonSqueezyUrl,
+            secondaryCta: "Buy now",
+            tags: digitalProduct.tags,
+            color: "blue",
+          }}
+        />
+      ) : null}
 
       {relatedGrants.length > 0 && (
         <section className="space-y-4">

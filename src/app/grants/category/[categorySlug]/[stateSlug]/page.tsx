@@ -90,7 +90,7 @@ async function loadCategoryStateGrants(category: CategoryRecord, state: { code: 
     .order("scraped_at", { ascending: false })
     .limit(PAGE_SIZE);
 
-  query = query.or("published.is.null,published.eq.true");
+  query = query.or("active.is.null,active.eq.true");
 
   const { data, error } = await query;
 

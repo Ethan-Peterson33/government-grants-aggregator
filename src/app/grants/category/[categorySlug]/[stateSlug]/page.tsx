@@ -12,6 +12,7 @@ import { wordsFromSlug } from "@/lib/strings";
 
 const PAGE_SIZE = 100;
 
+
 type Params = { categorySlug: string; stateSlug: string };
 
 type CategoryRecord = {

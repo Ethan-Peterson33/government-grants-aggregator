@@ -115,55 +115,80 @@ function buildCopy(context: PageContext) {
 }
 
 export async function generateMetadata({ params }: { params: Params | Promise<Params> }): Promise<Metadata> {
-  const resolvedParams = await resolveRouteParams(params, "category-state.metadata");
-  if (!resolvedParams) return {};
+  console.group("🧭 [Metadata Generation] Category/State Page");
 
-  const context = await loadContext(resolvedParams);
-  if (!context) return {};
+  try {
+    const resolvedParams = await resolveRouteParams(params, "category-state.metadata");
+    console.log("➡️ Resolved Params:", resolvedParams);
+    if (!resolvedParams) {
+      console.warn("⚠️ No route parameters resolved.");
+      console.groupEnd();
+      return {};
+    }
 
-  const { copy, categoryLabel } = buildCopy(context);
+    const context = await loadContext(resolvedParams);
+    console.log("📦 Loaded Context:", context);
+    if (!context) {
+      console.warn("⚠️ Context could not be loaded.");
+      console.groupEnd();
+      return {};
+    }
 
-  const defaultTitle = `${context.state.name} ${categoryLabel} Grants | GrantDirectory.org`;
-  const title = copy?.seoTitle ?? defaultTitle;
+    const { copy, categoryLabel } = buildCopy(context);
+    console.log("🧩 buildCopy Result:", { copy, categoryLabel });
 
-  const description =
-    copy?.seoDescription ??
-    `Browse ${categoryLabel.toLowerCase()} grants available in ${context.state.name}, including state and local programs.`;
+    const defaultTitle = `${context.state.name} ${categoryLabel} Grants | GrantDirectory.org`;
+    const title = copy?.seoTitle ?? defaultTitle;
 
-  const canonical = `https://www.grantdirectory.org/grants/category/${context.category.slug}/${context.stateSlug}`;
+    const description =
+      copy?.seoDescription ??
+      `Browse ${categoryLabel.toLowerCase()} grants available in ${context.state.name}, including state and local programs.`;
 
-  const ogImageUrl = `https://www.grantdirectory.org/images/${context.stateSlug}-grants.jpg`;
+    const canonical = `https://www.grantdirectory.org/grants/category/${context.category.slug}/${context.stateSlug}`;
+    const ogImageUrl = `https://www.grantdirectory.org/images/${context.stateSlug}-grants.jpg`;
 
-  
-  return {
-    title,
-    description,
-    alternates: {
+    // Log the final metadata for inspection
+    console.log("✅ Final Metadata:", {
+      title,
+      description,
       canonical,
-    },
-    openGraph: {
+      ogImageUrl,
+    });
+
+    console.groupEnd();
+
+    return {
       title,
       description,
-      url: canonical,
-      siteName: "Grant Directory",
-      type: "article",
-      locale: "en_US",
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: 630,
-          alt: `${context.state.name} ${categoryLabel} Grants`,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [ogImageUrl],
-    },
-  };
+      alternates: { canonical },
+      openGraph: {
+        title,
+        description,
+        url: canonical,
+        siteName: "Grant Directory",
+        type: "article",
+        locale: "en_US",
+        images: [
+          {
+            url: ogImageUrl,
+            width: 1200,
+            height: 630,
+            alt: `${context.state.name} ${categoryLabel} Grants`,
+          },
+        ],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [ogImageUrl],
+      },
+    };
+  } catch (error) {
+    console.error("❌ [Metadata Error]:", error);
+    console.groupEnd();
+    return {};
+  }
 }
 
 

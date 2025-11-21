@@ -98,6 +98,7 @@ export const categoryStateCopy: Record<string, Record<string, CategoryStateCopy>
       seoDescription:
         "Find Florida first-time homebuyer programs and down payment assistance options for new homeowners, including state and local housing initiatives.",
     },
+    
     california: {
       heading: "California First-Time Homebuyer & Housing Assistance",
       intro:

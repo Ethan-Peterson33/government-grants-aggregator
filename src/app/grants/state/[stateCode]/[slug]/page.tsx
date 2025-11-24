@@ -20,6 +20,7 @@ import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
 import { findDigitalProductByCategorySlug } from "@/config/digital-products";
+import { wordsFromSlug } from "@/lib/strings";
 
 type StateParams = { stateCode: string; slug: string };
 
@@ -136,13 +137,22 @@ export default async function StateGrantDetailPage({
     .slice(0, 6 - relatedCategory.length);
   const relatedGrants = [...relatedCategory, ...additionalStatewide];
 
+  const categorySlug = grant.grant_categories?.slug ?? grant.category ?? undefined;
+  const categoryLabel = grant.grant_categories?.category_label ?? (categorySlug ? wordsFromSlug(categorySlug) : null);
   const relatedLinks = [
     { label: "Federal grants", href: "/grants/federal" },
     { label: `Search all ${stateInfo.code} funding`, href: `/grants?state=${encodeURIComponent(stateInfo.code)}` },
+    ...(categorySlug
+      ? [
+          {
+            label: `${stateInfo.name} ${categoryLabel ?? "category"} grants`,
+            href: `/grants/category/${categorySlug}/${stateInfo.code}`,
+          },
+        ]
+      : []),
   ];
 
   const grantJsonLd = generateGrantJsonLd(grant, { path: canonical });
-  const categorySlug = grant.grant_categories?.slug ?? grant.category ?? undefined;
   const digitalProduct = findDigitalProductByCategorySlug(categorySlug);
 
   return (

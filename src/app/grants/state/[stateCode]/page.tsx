@@ -56,16 +56,20 @@ async function loadStateCategoryLinks(stateCode: string, stateName: string): Pro
   const accumulator = new Map<string, StateCategoryLink>();
 
   for (const entry of data ?? []) {
+    const categoryRelation = Array.isArray(entry?.grant_categories)
+      ? entry.grant_categories[0]
+      : entry?.grant_categories;
+
     const categoryLabel =
-      typeof entry?.grant_categories?.category_label === "string" && entry.grant_categories.category_label.trim().length > 0
-        ? entry.grant_categories.category_label.trim()
+      typeof categoryRelation?.category_label === "string" && categoryRelation.category_label.trim().length > 0
+        ? categoryRelation.category_label.trim()
         : typeof entry?.category === "string" && entry.category.trim().length > 0
           ? entry.category.trim()
           : null;
 
     const categorySlug =
-      typeof entry?.grant_categories?.slug === "string" && entry.grant_categories.slug.trim().length > 0
-        ? entry.grant_categories.slug.trim()
+      typeof categoryRelation?.slug === "string" && categoryRelation.slug.trim().length > 0
+        ? categoryRelation.slug.trim()
         : categoryLabel
           ? slugify(categoryLabel)
           : null;

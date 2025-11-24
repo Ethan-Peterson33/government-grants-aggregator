@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import Link from "next/link";
 import { AffiliateOfferCard } from "@/components/affiliate-offer-card";
 import { Breadcrumb } from "@/components/grants/breadcrumb";
 import type { FilterOption } from "@/components/grants/filters-bar";
@@ -13,18 +14,77 @@ import {
   type SearchParamsLike,
 } from "@/app/grants/_components/route-params";
 
-import { resolveStateParam } from "@/lib/grant-location";
-import { wordsFromSlug } from "@/lib/strings";
+import { resolveStateParam, stateNameCandidatesFromCode } from "@/lib/grant-location";
+import { slugify, wordsFromSlug } from "@/lib/strings";
 import { generateBreadcrumbJsonLd, generateItemListJsonLd } from "@/lib/seo";
-
 import { safeNumber, searchGrants, getFacetSets } from "@/lib/search";
 import type { GrantFilters } from "@/lib/types";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const PAGE_SIZE = 12;
+
+type StateCategoryLink = {
+  label: string;
+  slug: string;
+  count: number;
+};
 
 function formatCategory(value: string | undefined): string | undefined {
   if (!value) return undefined;
   return wordsFromSlug(value.toLowerCase().replace(/\s+/g, "-"));
+}
+
+async function loadStateCategoryLinks(stateCode: string, stateName: string): Promise<StateCategoryLink[]> {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) return [];
+
+  const stateCandidates = Array.from(
+    new Set([stateCode, stateCode.toUpperCase(), stateCode.toLowerCase(), stateName, ...stateNameCandidatesFromCode(stateCode)])
+  ).filter(Boolean);
+
+  const { data, error } = await supabase
+    .from("grants")
+    .select("category, grant_categories(category_label, slug)")
+    .in("state", stateCandidates)
+    .or("active.is.null,active.eq.true");
+
+  if (error) {
+    console.error("[state] Error loading category links", { stateCode, error });
+    return [];
+  }
+
+  const accumulator = new Map<string, StateCategoryLink>();
+
+  for (const entry of data ?? []) {
+    const categoryRelation = Array.isArray(entry?.grant_categories)
+      ? entry.grant_categories[0]
+      : entry?.grant_categories;
+
+    const categoryLabel =
+      typeof categoryRelation?.category_label === "string" && categoryRelation.category_label.trim().length > 0
+        ? categoryRelation.category_label.trim()
+        : typeof entry?.category === "string" && entry.category.trim().length > 0
+          ? entry.category.trim()
+          : null;
+
+    const categorySlug =
+      typeof categoryRelation?.slug === "string" && categoryRelation.slug.trim().length > 0
+        ? categoryRelation.slug.trim()
+        : categoryLabel
+          ? slugify(categoryLabel)
+          : null;
+
+    if (!categoryLabel || !categorySlug) continue;
+
+    const existing = accumulator.get(categorySlug);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      accumulator.set(categorySlug, { label: categoryLabel, slug: categorySlug, count: 1 });
+    }
+  }
+
+  return Array.from(accumulator.values()).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /* --------------------------
@@ -104,9 +164,9 @@ export default async function StateGrantsPage({
     jurisdiction: "state",
   };
 
-  const [{ grants, total, totalPages }, facets] = await Promise.all([
-    searchGrants(filters),
-    getFacetSets(),
+  const [[{ grants, total, totalPages }, facets], categoryLinks] = await Promise.all([
+    Promise.all([searchGrants(filters), getFacetSets()]),
+    loadStateCategoryLinks(stateInfo.code, stateInfo.name),
   ]);
 
   /* --------------------------
@@ -155,21 +215,45 @@ export default async function StateGrantsPage({
         </p>
       </header>
 {/* ---- NEW STATIC CONTENT BLOCK ---- */}
-{stateSeoContent && (
-  <section className="prose prose-slate max-w-none py-4">
-    {stateSeoContent.heading && (
-      <h2 className="text-2xl font-semibold">{stateSeoContent.heading}</h2>
-    )}
+      {stateSeoContent && (
+        <section className="prose prose-slate max-w-none py-4">
+          {stateSeoContent.heading && (
+            <h2 className="text-2xl font-semibold">{stateSeoContent.heading}</h2>
+          )}
 
     {stateSeoContent.intro && (
       <p className="text-slate-700">{stateSeoContent.intro}</p>
     )}
 
-    {stateSeoContent.body && (
-      <p className="text-slate-700">{stateSeoContent.body}</p>
-    )}
-  </section>
-)}
+          {stateSeoContent.body && (
+            <p className="text-slate-700">{stateSeoContent.body}</p>
+          )}
+        </section>
+      )}
+
+      {categoryLinks.length > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold text-slate-900">Browse by category</h2>
+            <p className="text-sm text-slate-600">
+              Jump straight to {stateInfo.name} grants filtered by focus area.
+            </p>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {categoryLinks.map((category) => (
+              <Link
+                key={category.slug}
+                href={`/grants/category/${category.slug}/${stateInfo.code}`}
+                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-800 hover:bg-slate-100"
+              >
+                {category.label}
+                <span className="ml-1 text-slate-500">({category.count})</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {/* --------------------------
            FILTER + CLIENT SEARCH
       --------------------------- */}

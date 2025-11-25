@@ -13,17 +13,15 @@ import {
   type MaybePromise,
   type SearchParamsLike,
 } from "@/app/grants/_components/route-params";
-import { resolveStateParam } from "@/lib/grant-location";
-import { inferGrantLocation } from "@/lib/grant-location";
+import { resolveStateParam, inferGrantLocation } from "@/lib/grant-location";
 import { generateBreadcrumbJsonLd, generateGrantJsonLd } from "@/lib/seo";
 import { searchGrants } from "@/lib/search";
 import { grantPath } from "@/lib/slug";
 import type { Grant } from "@/lib/types";
-import { findDigitalProductByCategorySlug } from "@/config/digital-products";
+import { digitalProducts } from "@/config/digital-products";
 import { wordsFromSlug } from "@/lib/strings";
 
 type StateParams = { stateCode: string; slug: string };
-
 type StateSearchParams = SearchParamsLike;
 
 export async function generateMetadata({
@@ -138,10 +136,15 @@ export default async function StateGrantDetailPage({
   const relatedGrants = [...relatedCategory, ...additionalStatewide];
 
   const categorySlug = grant.grant_categories?.slug ?? grant.category ?? undefined;
-  const categoryLabel = grant.grant_categories?.category_label ?? (categorySlug ? wordsFromSlug(categorySlug) : null);
+  const categoryLabel =
+    grant.grant_categories?.category_label ?? (categorySlug ? wordsFromSlug(categorySlug) : null);
+
   const relatedLinks = [
     { label: "Federal grants", href: "/grants/federal" },
-    { label: `Search all ${stateInfo.code} funding`, href: `/grants?state=${encodeURIComponent(stateInfo.code)}` },
+    {
+      label: `Search all ${stateInfo.code} funding`,
+      href: `/grants?state=${encodeURIComponent(stateInfo.code)}`,
+    },
     ...(categorySlug
       ? [
           {
@@ -153,7 +156,9 @@ export default async function StateGrantDetailPage({
   ];
 
   const grantJsonLd = generateGrantJsonLd(grant, { path: canonical });
-  const digitalProduct = findDigitalProductByCategorySlug(categorySlug);
+
+  // ✅ Pick a digital product to feature (e.g., homebuyer toolkit)
+  const digitalProduct = digitalProducts.find((product) => product.category === "homebuyer");
 
   return (
     <div className="container-grid space-y-10 py-10">
@@ -172,6 +177,7 @@ export default async function StateGrantDetailPage({
             secondaryCta: "Buy now",
             tags: digitalProduct.tags,
             color: "blue",
+            secondaryExternal: true,
           }}
         />
       ) : null}
@@ -199,7 +205,9 @@ export default async function StateGrantDetailPage({
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
-            generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
+            generateBreadcrumbJsonLd(
+              breadcrumbItems.map((item) => ({ name: item.label, url: item.href })),
+            ),
             grantJsonLd,
           ]),
         }}

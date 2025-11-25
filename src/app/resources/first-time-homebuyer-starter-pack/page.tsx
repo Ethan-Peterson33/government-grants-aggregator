@@ -1,3 +1,4 @@
+// app/products/first-time-homebuyer-starter-pack/page.tsx
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -9,22 +10,22 @@ const product = digitalProducts.find(
 );
 
 export const metadata: Metadata = {
-  title: "First-Time Homebuyer Starter Pack (2025 Edition) | GrantDirectory.org",
+  title: "First-Time Homebuyer Starter Pack (PDF + Excel/Google Sheet Budget Template) | GrantDirectory.org",
   description:
-    "A complete digital workbook for first-time buyers with checklists, timelines, grant guidance, and worksheets.",
+    "A complete toolkit for first-time homebuyers — includes 9 checklists, guides and worksheets, plus an editable Excel/Google Sheet budget & affordability calculator.",
 };
 
 const whatsInside = [
   "90-Day Homebuying Roadmap",
-  "Down Payment Assistance Eligibility Checklist",
-  "Complete Document Checklist (fillable)",
+  "Eligibility Checklist",
+  "Document Checklist (fillable)",
   "30-Day Credit Boost Plan",
   "2025 Grant Calendar",
   "Loan Program Comparison Chart",
-  "Homebuyer Budget Worksheet",
+  "Homebuyer Budget Worksheet (Google Sheet + Excel)",
   "Assistance Program Tracker",
   "Closing Week Checklist",
-  "Bonus: Grant Stacking Guide ($25k–$40k+ examples)",
+  "Bonus: Grant Stacking Guide ($25k-$40k+ examples)",
 ];
 
 const whoItsFor = [
@@ -37,15 +38,17 @@ const whyItWorks = [
   {
     title: "Grant-focused",
     description:
-      "Built with an emphasis on down payment assistance and first-time buyer programs so you know where to start.",
+      "Built with an emphasis on down payment assistance and first-time buyer programs so you know exactly where to start.",
   },
   {
     title: "Checklists, not fluff",
-    description: "Practical, fillable pages keep you organized and moving forward without the jargon.",
+    description:
+      "Practical, fillable pages keep you organized and moving forward without the jargon.",
   },
   {
     title: "Step-by-step flow",
-    description: "Follow a clear timeline from credit prep to closing week, with reminders for each milestone.",
+    description:
+      "Follow a clear timeline from credit prep to closing week, with reminders for each milestone.",
   },
 ];
 
@@ -59,7 +62,7 @@ const outcomes = [
 const faqs = [
   {
     question: "Is this a physical book or digital download?",
-    answer: "It's a digital PDF you can print or use on any device.",
+    answer: "It's a digital PDF + Google Sheet you can print or use on any device.",
   },
   {
     question: "Does this include state-specific grants?",
@@ -96,7 +99,7 @@ export default function FirstTimeHomebuyerStarterPackPage() {
               {product.name}
             </h1>
             <p className="text-lg text-slate-700">
-              A complete roadmap, checklist system, and grant-focused workbook to help you buy your first home with confidence.
+              A complete roadmap, checklist system and grant-focused workbook to help you buy your first home with confidence.
             </p>
             <p className="text-base text-slate-700 leading-relaxed">
               {product.longDescription}
@@ -113,7 +116,7 @@ export default function FirstTimeHomebuyerStarterPackPage() {
             </div>
             <div className="flex flex-wrap gap-3 pt-4">
               <Link
-                href={product.lemonSqueezyUrl}
+                href="https://ethanverse4852.gumroad.com/l/FTHB-Starter-Pack"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -130,21 +133,21 @@ export default function FirstTimeHomebuyerStarterPackPage() {
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 shadow-inner">
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">
-              What's included
+              What’s included
             </p>
             <ul className="mt-4 space-y-2 text-sm text-slate-800">
-              <li>• 90-day roadmap and weekly milestones</li>
-              <li>• Fillable checklists and trackers</li>
-              <li>• Grant and DPA guidance</li>
-              <li>• Loan comparison and budgeting tools</li>
-              <li>• Printable and device-friendly PDF</li>
+              <li>• 11 premium homebuyer planning tools</li>
+              <li>• Editable Google Sheet budget + affordability calculator</li>
+              <li>• PDF toolkit for print and device use</li>
+              <li>• Grant and down-payment readiness resources</li>
+              <li>• Step-by-step roadmap from budget to closing</li>
             </ul>
           </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold text-slate-900">
-            What's inside the Starter Pack
+            What’s inside the Starter Pack
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {whatsInside.map((item) => (
@@ -181,7 +184,7 @@ export default function FirstTimeHomebuyerStarterPackPage() {
         </section>
 
         <section className="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-2xl font-semibold text-slate-900">What you'll walk away with</h2>
+          <h2 className="text-2xl font-semibold text-slate-900">What you’ll walk away with</h2>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2 text-slate-700">
             {outcomes.map((item) => (
               <li key={item} className="rounded-md bg-slate-50 px-3 py-2 text-sm">

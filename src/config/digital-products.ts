@@ -16,27 +16,23 @@ export const digitalProducts: DigitalProduct[] = [
     slug: "first-time-homebuyer-starter-pack",
     name: "First-Time Homebuyer Starter Pack (2025 Edition)",
     shortDescription:
-      "A complete first-time homebuyer workbook with checklists, timelines, grant guidance, and fillable worksheets to help you go from renter to homeowner.",
+      "A complete first-time homebuyer toolkit: 9 checklists, timelines, grant guidance, worksheets + editable Excel/Google Sheet budget & affordability calculator.",
     longDescription:
-      "The Starter Pack is a guided, fillable PDF workbook that keeps you organized from credit prep to closing. Use the checklists, trackers, and timelines to discover grants, compare loan programs, and stay on top of every document you need to become a confident first-time homebuyer.",
+      "The Starter Pack is a guided, fillable PDF workbook *and* editable Google Sheet that keeps you organized from credit prep to closing. Use the checklists, trackers, timelines, and budget tools to discover grants, compare loan programs, and confidently buy your first home.",
     category: "homebuyer",
     supportedCategorySlugs: ["first-time-homeowner", "first-time-homebuyer", "homebuyer"],
-    tags: ["Digital PDF", "First-Time Homebuyers"],
-    lemonSqueezyUrl: "https://example.lemon.group/buy/homebuyer-starter-pack",
+    tags: [
+      "first-time homebuyer",
+      "homebuyer starter pack",
+      "home buying checklist",
+      "budget template",
+      "google sheet budget",
+      "down payment assistance",
+      "homeownership toolkit",
+      "digital download",
+      "PDF workbook",
+      "affordability calculator"
+    ],
+    lemonSqueezyUrl: "https://ethanverse4852.gumroad.com/l/FTHB-Starter-Pack"
   },
 ];
-
-export function findDigitalProductByCategorySlug(slug?: string | null) {
-  if (!slug) return undefined;
-
-  const normalized = slugify(slug);
-
-  if (!normalized) return undefined;
-
-  return digitalProducts.find((product) => {
-    const productSlug = slugify(product.category);
-    const extraSlugs = product.supportedCategorySlugs?.map((item) => slugify(item)) ?? [];
-
-    return productSlug === normalized || extraSlugs.includes(normalized);
-  });
-}

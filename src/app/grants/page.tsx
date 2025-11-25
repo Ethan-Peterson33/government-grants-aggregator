@@ -161,226 +161,266 @@ export default async function GrantsIndexPage({
     { label: "New York City grants", href: "/grants/local/NY/new-york-city" },
   ];
 
-  return (
+    return (
     <div className="container-grid space-y-8 py-10">
       <Breadcrumb items={breadcrumbItems} />
 
-      <section className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)] items-start">
+      <section className="grid items-start gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
         {/* MAIN COLUMN */}
         <div className="space-y-8">
           {/* HERO / INTRO */}
-          <header className="space-y-4 rounded-xl border border-slate-200 bg-white px-5 py-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-              Find funding faster
-            </p>
-            <div className="space-y-3">
-              <h1 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-                Search grants from public and private funders in one place
-              </h1>
-              <p className="text-slate-600 text-sm sm:text-base">
-                Browse funding opportunities from federal agencies, states, local governments,
-                private foundations, and corporate programs. Filter by keyword, agency, or
-                eligibility to find grants that match your nonprofit, small business, or community
-                project.
-              </p>
+          <header className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-sky-50 to-blue-50 px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+            <style>{`
+              @keyframes hero-fade-up {
+                0% { opacity: 0; transform: translateY(20px); }
+                100% { opacity: 1; transform: translateY(0); }
+              }
+              .hero-fade-up {
+                opacity: 0;
+                transform: translateY(20px);
+                animation: hero-fade-up 0.85s ease-out forwards;
+              }
+            `}</style>
+
+            {/* Subtle blurred background image */}
+            <div className="pointer-events-none absolute inset-0 opacity-60">
+              <div
+                className="h-full w-full bg-cover bg-center blur-sm"
+                style={{
+                  backgroundImage:
+                    "url('https://images.pexels.com/photos/7579121/pexels-photo-7579121.jpeg?auto=compress&cs=tinysrgb&w=1600')",
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/90 via-sky-50/90 to-blue-50/95" />
             </div>
 
-            {/* QUICK INTERNAL LINKS / CHIPS */}
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              <Link
-                href="/grants/federal"
-                className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-medium text-blue-800 hover:bg-blue-100"
-              >
-                Federal grants overview
-              </Link>
-              {randomState && (
-              <Link
-                href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
-                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-              >
-                Funding in {randomState.label}
-                </Link>
-              )}
-              {randomCategory && (
+            <div className="relative z-10 space-y-6">
+              <p className="hero-fade-up text-xs font-semibold uppercase tracking-wide text-blue-700 [animation-delay:0.02s]">
+                Find funding faster
+              </p>
+
+              <div className="space-y-4">
+                <h1 className="hero-fade-up text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-5xl [animation-delay:0.06s]">
+                  Find every first-time home buyer grant &amp; down payment assistance program in
+                  the U.S.
+                </h1>
+                <p className="hero-fade-up text-sm text-slate-700 sm:text-base lg:text-lg [animation-delay:0.12s]">
+                  $0 – $100,000+ in free money. Updated daily across all 50 states + DC. Compare
+                  programs from HUD-approved agencies, lenders, cities, and state housing
+                  authorities in one place.
+                </p>
+              </div>
+
+              {/* CTAS */}
+              <div className="hero-fade-up flex flex-col gap-3 sm:flex-row sm:items-center [animation-delay:0.18s]">
                 <Link
-                  href={`/grants/category/${randomCategory.slug}`}
-                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                  href="#grant-search"
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-300/70 transition hover:bg-emerald-700 hover:shadow-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
                 >
-                  {randomCategory.label} programs
+                  Search all grants now
                 </Link>
-              )}
-              {/* <Link
-                href="/grants?has_apply_link=1"
-                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
-              >
-                Grants with apply links
-              </Link>*/}
+
+                <Link
+                  href="/resources/first-time-homebuyer-starter-pack"
+                  className="inline-flex items-center justify-center rounded-xl border border-[#FF5A5F] bg-white/80 px-6 py-3 text-sm font-semibold text-[#FF5A5F] shadow-sm backdrop-blur transition hover:bg-[#FF5A5F] hover:text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A5F] focus-visible:ring-offset-2"
+                >
+                  Download the 2025 FTHB Toolkit – Only $17
+                </Link>
+              </div>
+
+              {/* Trust line */}
+              <p className="hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
+                2,000+ programs listed • Verified by HUD &amp; state
+                agencies
+              </p>
+
+              {/* Quick internal links / chips */}
+              <div className="hero-fade-up mt-2 flex flex-wrap gap-2 text-xs sm:text-sm [animation-delay:0.3s]">
+                <Link
+                  href="/grants/category/first-time-homeowner"
+                  className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800 hover:bg-emerald-100"
+                >
+                  First-time homebuyer grants
+                </Link>
+
+                <Link
+                  href="/grants/category/small-business"
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                >
+                  Small business grants
+                </Link>
+
+                {randomState && (
+                  <Link
+                    href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                  >
+                    Funding in {randomState.label}
+                  </Link>
+                )}
+
+                {randomCategory && (
+                  <Link
+                    href={`/grants/category/${randomCategory.slug}`}
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 font-medium text-slate-800 hover:bg-slate-100"
+                  >
+                    {randomCategory.label} programs
+                  </Link>
+                )}
+              </div>
             </div>
           </header>
 
-        {/* SEARCH + RESULTS */}
-        <section className="space-y-6">
-          <GrantsSearchClient
-            initialFilters={{
-              query: query ?? "",
-              category: category ?? "",
-              state: state ?? "",
-              agency: agency ?? "",
-              hasApplyLink,
-              page,
-              pageSize,
-            }}
-            initialResults={{ grants, total, page, pageSize, totalPages }}
-            categories={categoryOptions}
-            states={stateOptions}
-            agencies={agencyOptions}
-          />
+          {/* SEARCH + RESULTS */}
+          <section id="grant-search" className="space-y-6">
+            <GrantsSearchClient
+              initialFilters={{
+                query: query ?? "",
+                category: category ?? "",
+                state: state ?? "",
+                agency: agency ?? "",
+                hasApplyLink,
+                page,
+                pageSize,
+              }}
+              initialResults={{ grants, total, page, pageSize, totalPages }}
+              categories={categoryOptions}
+              states={stateOptions}
+              agencies={agencyOptions}
+            />
 
-          {/* BROWSE POPULAR SECTIONS (INTERNAL LINK HUB) */}
-          <section
-            aria-label="Popular ways to browse grants"
-            className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-3"
-          >
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                By level of government
-              </h2>
-              <ul className="space-y-1 text-sm">
-                <li>
-                  <Link href="/grants/federal" className="text-blue-700 hover:text-blue-900">
-                    Federal grants (nationwide)
-                  </Link>
-                </li>
- 
-              </ul>
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                By location
-              </h2>
-              <ul className="space-y-1 text-sm">
-                {randomState && (
-                  <li key={randomState.value}>
-                    <Link
-                      href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
-                      className="text-blue-700 hover:text-blue-900"
-                    >
-                      Funding in {randomState.label}
+            {/* BROWSE POPULAR SECTIONS (INTERNAL LINK HUB) */}
+            <section
+              aria-label="Popular ways to browse grants"
+              className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-3"
+            >
+              <div className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  By level of government
+                </h2>
+                <ul className="space-y-1 text-sm">
+                  <li>
+                    <Link href="/grants/federal" className="text-blue-700 hover:text-blue-900">
+                      Federal grants (nationwide)
                     </Link>
                   </li>
-                )}
-                <li className="text-slate-500 text-xs">
-                  More states will appear here as coverage expands.
-                </li>
-              </ul>
-            </div>
+                </ul>
+              </div>
 
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                By program type
-              </h2>
-              <ul className="space-y-1 text-sm">
-                <li>
-                  <Link
-                    href="/grants/category/small-business"
-                    className="text-blue-700 hover:text-blue-900"
-                  >
-                    Small business grants
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/grants/category/nonprofit"
-                    className="text-blue-700 hover:text-blue-900"
-                  >
-                    Nonprofit grants
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/grants/category/community"
-                    className="text-blue-700 hover:text-blue-900"
-                  >
-                    Local community funding
-                  </Link>
-                </li>
-                <li>
-                  {/* Ensure first-time homebuyer category is discoverable alongside other program types */}
-                  <Link
-                    href="/grants/category/first-time-homeowner"
-                    className="text-blue-700 hover:text-blue-900"
-                  >
-                    First-time homebuyer grants
-                  </Link>
-                </li>
-              </ul>
-            </div>
+              <div className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  By location
+                </h2>
+                <ul className="space-y-1 text-sm">
+                  {randomState && (
+                    <li key={randomState.value}>
+                      <Link
+                        href={`/grants/state/${slugify(randomState.value) ?? randomState.value}`}
+                        className="text-blue-700 hover:text-blue-900"
+                      >
+                        Funding in {randomState.label}
+                      </Link>
+                    </li>
+                  )}
+                  <li className="text-xs text-slate-500">
+                    More states will appear here as coverage expands.
+                  </li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  By program type
+                </h2>
+                <ul className="space-y-1 text-sm">
+                  <li>
+                    <Link
+                      href="/grants/category/small-business"
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      Small business grants
+                    </Link>
+                  </li>
+        
+      
+                  <li>
+                    <Link
+                      href="/grants/category/first-time-homeowner"
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      First-time homebuyer grants
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </section>
           </section>
-        </section>
-      </div>
+        </div>
 
-      {/* RIGHT SIDEBAR */}
-      <div className="w-full space-y-4 lg:w-72">
-        <RelatedLinks links={relatedLinks.length ? relatedLinks : fallbackLinks} />
+        {/* RIGHT SIDEBAR */}
+        <div className="w-full space-y-4 lg:w-72">
+          <RelatedLinks links={relatedLinks.length ? relatedLinks : fallbackLinks} />
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">
-            Helpful links
-          </h2>
+          <section className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Helpful links
+            </h2>
 
-          <ul className="space-y-2">
-            <li>
-              <Link
-                href="/grants/category/small-business"
-                className="text-blue-700 font-medium hover:text-blue-900 transition"
-              >
-                Small business grant resources
-              </Link>
-              <p className="text-slate-500 text-xs mt-1">
-                Search funding and guides tailored to startups and established businesses.
-              </p>
-            </li>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  href="/grants/category/small-business"
+                  className="font-medium text-blue-700 transition hover:text-blue-900"
+                >
+                  Small business grant resources
+                </Link>
+                <p className="mt-1 text-xs text-slate-500">
+                  Search funding and guides tailored to startups and established businesses.
+                </p>
+              </li>
 
-            <li>
-              <Link
-                href="/grants/category/nonprofit"
-                className="text-blue-700 font-medium hover:text-blue-900 transition"
-              >
-                Nonprofit funding resources
-              </Link>
-              <p className="text-slate-500 text-xs mt-1">
-                Explore private and government programs that support charitable missions.
-              </p>
-            </li>
+              <li>
+                <Link
+                  href="/grants/category/nonprofit"
+                  className="font-medium text-blue-700 transition hover:text-blue-900"
+                >
+                  Nonprofit funding resources
+                </Link>
+                <p className="mt-1 text-xs text-slate-500">
+                  Explore private and government programs that support charitable missions.
+                </p>
+              </li>
 
-            <li>
-              <Link
-                href="/grants/category/first-time-homeowner"
-                className="text-blue-700 font-medium hover:text-blue-900 transition"
-              >
-                First-time homebuyer grants
-              </Link>
-              <p className="text-slate-500 text-xs mt-1">
-                Browse programs supporting new homeowners, including down payment assistance.
-              </p>
-            </li>
-          </ul>
-        </section>
-      </div>
-    </section>
+              <li>
+                <Link
+                  href="/grants/category/first-time-homeowner"
+                  className="font-medium text-blue-700 transition hover:text-blue-900"
+                >
+                  First-time homebuyer grants
+                </Link>
+                <p className="mt-1 text-xs text-slate-500">
+                  Browse programs supporting new homeowners, including down payment assistance.
+                </p>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </section>
 
-    <script
-      type="application/ld+json"
-      suppressHydrationWarning
-      dangerouslySetInnerHTML={{
-        __html: JSON.stringify([
-          generateBreadcrumbJsonLd(breadcrumbItems.map((item) => ({ name: item.label, url: item.href }))),
-          itemListJsonLd,
-        ]),
-      }}
-    />
-  </div>
-);
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            generateBreadcrumbJsonLd(
+              breadcrumbItems.map((item) => ({ name: item.label, url: item.href })),
+            ),
+            itemListJsonLd,
+          ]),
+        }}
+      />
+    </div>
+  );
+
 
 }

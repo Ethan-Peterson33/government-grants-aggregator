@@ -204,33 +204,78 @@ export default async function StateGrantsPage({
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
 
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-slate-900">
+    {/* STATE HERO */}
+  <header className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-sky-50 to-blue-50 px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+    <style>{`
+      @keyframes state-hero-fade-up {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      .state-hero-fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: state-hero-fade-up 0.85s ease-out forwards;
+      }
+    `}</style>
+
+    {/* Subtle blurred background image */}
+    <div className="pointer-events-none absolute inset-0 opacity-60">
+      <div
+        className="h-full w-full bg-cover bg-center blur-sm"
+        style={{
+          backgroundImage:
+            "url('https://images.pexels.com/photos/7579121/pexels-photo-7579121.jpeg?auto=compress&cs=tinysrgb&w=1600')",
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/90 via-sky-50/90 to-blue-50/95" />
+    </div>
+
+    <div className="relative z-10 space-y-6">
+      <p className="state-hero-fade-up text-xs font-semibold uppercase tracking-wide text-blue-700 [animation-delay:0.02s]">
+        Grants in {stateInfo.name}
+      </p>
+
+      <div className="space-y-4">
+        <h1 className="state-hero-fade-up text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-5xl [animation-delay:0.06s]">
           {category
             ? `${category} grants in ${stateInfo.name}`
-            : `${stateInfo.name} statewide grants`}
+            : `${stateInfo.name} statewide grants & funding programs`}
         </h1>
-        <p className="text-slate-600">
-          Explore active funding opportunities throughout {stateInfo.name}.
+
+        <p className="state-hero-fade-up text-sm text-slate-700 sm:text-base lg:text-lg [animation-delay:0.12s]">
+          {stateSeoContent?.intro
+            ? stateSeoContent.intro
+            : `Explore active funding opportunities from state agencies, cities, and local partners across ${stateInfo.name}. Filter by category, agency, or keyword to find grants that match your project, business, or community.`}
         </p>
-      </header>
-{/* ---- NEW STATIC CONTENT BLOCK ---- */}
-      {stateSeoContent && (
-        <section className="prose prose-slate max-w-none py-4">
-          {stateSeoContent.heading && (
-            <h2 className="text-2xl font-semibold">{stateSeoContent.heading}</h2>
-          )}
+      </div>
 
-    {stateSeoContent.intro && (
-      <p className="text-slate-700">{stateSeoContent.intro}</p>
-    )}
+      {/* CTAS */}
+      <div className="state-hero-fade-up flex flex-col gap-3 sm:flex-row sm:items-center [animation-delay:0.18s]">
+        <Link
+          href="#state-grant-search"
+          className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-300/70 transition hover:bg-emerald-700 hover:shadow-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+        >
+          Search {stateInfo.name} grants now
+        </Link>
 
-          {stateSeoContent.body && (
-            <p className="text-slate-700">{stateSeoContent.body}</p>
-          )}
-        </section>
-      )}
+        {homebuyerProduct && (
+          <Link
+            href={`/resources/${homebuyerProduct.slug}`}
+            className="inline-flex items-center justify-center rounded-xl border border-[#FF5A5F] bg-white/80 px-6 py-3 text-sm font-semibold text-[#FF5A5F] shadow-sm backdrop-blur transition hover:bg-[#FF5A5F] hover:text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A5F] focus-visible:ring-offset-2"
+          >
+            Download the 2025 FTHB Toolkit – Only $17
+          </Link>
+        )}
+      </div>
 
+      {/* Trust / meta line */}
+      <p className="state-hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
+        {total.toLocaleString()} programs currently listed in {stateInfo.name} • Updated daily
+      </p>
+    </div>
+  </header>
+
+  
       {categoryLinks.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="space-y-2">

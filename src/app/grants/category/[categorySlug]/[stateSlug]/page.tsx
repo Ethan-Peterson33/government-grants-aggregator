@@ -213,9 +213,71 @@ export default async function CategoryStatePage({ params }: { params: Params | P
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
       <Breadcrumb items={breadcrumbItems} />
 
-      <header className="space-y-3">
-        <h1 className="text-3xl font-semibold text-slate-800">{heading}</h1>
-        <p className="text-slate-600">{intro}</p>
+     {/* HERO */}
+      <header className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-sky-50 to-blue-50 px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+        <style>{`
+          @keyframes category-state-hero-fade-up {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          .category-state-hero-fade-up {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: category-state-hero-fade-up 0.85s ease-out forwards;
+          }
+        `}</style>
+
+        {/* Subtle blurred background image */}
+        <div className="pointer-events-none absolute inset-0 opacity-60">
+          <div
+            className="h-full w-full bg-cover bg-center blur-sm"
+            style={{
+              backgroundImage:
+                "url('https://images.pexels.com/photos/7579121/pexels-photo-7579121.jpeg?auto=compress&cs=tinysrgb&w=1600')",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/90 via-sky-50/90 to-blue-50/95" />
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <p className="category-state-hero-fade-up text-xs font-semibold uppercase tracking-wide text-blue-700 [animation-delay:0.02s]">
+            {context.state.name} • {categoryLabel} programs
+          </p>
+
+          <div className="space-y-4">
+            <h1 className="category-state-hero-fade-up text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-5xl [animation-delay:0.06s]">
+              {heading}
+            </h1>
+            <p className="category-state-hero-fade-up text-sm text-slate-700 sm:text-base lg:text-lg [animation-delay:0.12s]">
+              {intro}
+            </p>
+          </div>
+
+          {/* CTAs */}
+          <div className="category-state-hero-fade-up flex flex-col gap-3 sm:flex-row sm:items-center [animation-delay:0.18s]">
+            <a
+              href="#category-state-list"
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-300/70 transition hover:bg-emerald-700 hover:shadow-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+            >
+              View all programs below
+            </a>
+            <a
+              href={`/grants/category/${context.category.slug}`}
+              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur transition hover:bg-slate-900 hover:text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            >
+              Browse all {categoryLabel.toLowerCase()} grants
+            </a>
+          </div>
+
+          {/* Meta / trust line */}
+          <p className="category-state-hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
+            {grants.length > 0
+              ? `${grants.length.toLocaleString()} active program${
+                  grants.length === 1 ? "" : "s"
+                } in ${context.state.name}`
+              : `No active programs found yet in ${context.state.name} — new grants added weekly.`}
+          </p>
+        </div>
       </header>
 
       <section className="space-y-4">

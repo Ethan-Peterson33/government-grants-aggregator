@@ -192,12 +192,72 @@ export default async function CategoryGrantsPage({
     <div className="container-grid space-y-6 py-10">
       <Breadcrumb items={breadcrumbItems} />
 
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-slate-900">{categoryLabel} Grants</h1>
-        <p className="text-slate-600">
-          Discover current {categoryLabel.toLowerCase()} funding across federal, state, local, and private programs.
-        </p>
-      </header>
+   {/* CATEGORY HERO */}
+<header className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-sky-50 to-blue-50 px-5 py-8 shadow-sm sm:px-8 sm:py-10">
+  <style>{`
+    @keyframes category-hero-fade-up {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .category-hero-fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: category-hero-fade-up 0.85s ease-out forwards;
+    }
+  `}</style>
+
+  {/* Subtle blurred background image */}
+  <div className="pointer-events-none absolute inset-0 opacity-60">
+    <div
+      className="h-full w-full bg-cover bg-center blur-sm"
+      style={{
+        backgroundImage:
+          "url('https://images.pexels.com/photos/7579121/pexels-photo-7579121.jpeg?auto=compress&cs=tinysrgb&w=1600')",
+      }}
+    />
+    <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/90 via-sky-50/90 to-blue-50/95" />
+  </div>
+
+  <div className="relative z-10 space-y-6">
+    <p className="category-hero-fade-up text-xs font-semibold uppercase tracking-wide text-blue-700 [animation-delay:0.02s]">
+      {categoryLabel} Grants
+    </p>
+
+    <div className="space-y-4">
+      <h1 className="category-hero-fade-up text-3xl font-semibold leading-tight text-slate-900 sm:text-4xl lg:text-5xl [animation-delay:0.06s]">
+        Explore {categoryLabel} Grants Nationwide
+      </h1>
+
+      <p className="category-hero-fade-up text-sm text-slate-700 sm:text-base lg:text-lg [animation-delay:0.12s]">
+        Discover active {categoryLabel.toLowerCase()} funding across federal, state, local, and private funders.
+        Updated daily with new programs and opportunities.
+      </p>
+    </div>
+
+    {/* CTAs */}
+    <div className="category-hero-fade-up flex flex-col gap-3 sm:flex-row sm:items-center [animation-delay:0.18s]">
+      <a
+        href="#category-search"
+        className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-300/70 transition hover:bg-emerald-700 hover:shadow-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+      >
+        Search {categoryLabel} grants
+      </a>
+
+      <a
+        href="/resources/first-time-homebuyer-toolkit"
+        className="inline-flex items-center justify-center rounded-xl border border-[#FF5A5F] bg-white/80 px-6 py-3 text-sm font-semibold text-[#FF5A5F] shadow-sm backdrop-blur transition hover:bg-[#FF5A5F] hover:text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A5F] focus-visible:ring-offset-2"
+      >
+        Download the 2025 FTHB Toolkit – $17
+      </a>
+    </div>
+
+    {/* Trust Line */}
+    <p className="category-hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
+      {total.toLocaleString()} active programs listed • Updated daily • All 50 states + DC
+    </p>
+  </div>
+</header>
+
 
       {/* -------------------------------------------
           CATEGORY STATIC CONTENT (if exists)

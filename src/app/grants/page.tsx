@@ -230,7 +230,7 @@ export default async function GrantsIndexPage({
 
               {/* Trust line */}
               <p className="hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
-                2,000+ programs listed • Verified by HUD &amp; state
+                1800+ programs listed • Verified by HUD &amp; state
                 agencies
               </p>
 
@@ -333,6 +333,14 @@ export default async function GrantsIndexPage({
                   By program type
                 </h2>
                 <ul className="space-y-1 text-sm">
+                                    <li>
+                    <Link
+                      href="/grants/category/first-time-homeowner"
+                      className="text-blue-700 hover:text-blue-900"
+                    >
+                      First-time homebuyer grants
+                    </Link>
+                  </li>
                   <li>
                     <Link
                       href="/grants/category/small-business"
@@ -343,14 +351,7 @@ export default async function GrantsIndexPage({
                   </li>
         
       
-                  <li>
-                    <Link
-                      href="/grants/category/first-time-homeowner"
-                      className="text-blue-700 hover:text-blue-900"
-                    >
-                      First-time homebuyer grants
-                    </Link>
-                  </li>
+
                 </ul>
               </div>
             </section>
@@ -367,6 +368,17 @@ export default async function GrantsIndexPage({
             </h2>
 
             <ul className="space-y-2">
+                            <li>
+                <Link
+                  href="/grants/category/first-time-homeowner"
+                  className="font-medium text-blue-700 transition hover:text-blue-900"
+                >
+                  First-time homebuyer grants
+                </Link>
+                <p className="mt-1 text-xs text-slate-500">
+                  Browse programs supporting new homeowners, including down payment assistance.
+                </p>
+              </li>
               <li>
                 <Link
                   href="/grants/category/small-business"
@@ -379,29 +391,7 @@ export default async function GrantsIndexPage({
                 </p>
               </li>
 
-              <li>
-                <Link
-                  href="/grants/category/nonprofit"
-                  className="font-medium text-blue-700 transition hover:text-blue-900"
-                >
-                  Nonprofit funding resources
-                </Link>
-                <p className="mt-1 text-xs text-slate-500">
-                  Explore private and government programs that support charitable missions.
-                </p>
-              </li>
 
-              <li>
-                <Link
-                  href="/grants/category/first-time-homeowner"
-                  className="font-medium text-blue-700 transition hover:text-blue-900"
-                >
-                  First-time homebuyer grants
-                </Link>
-                <p className="mt-1 text-xs text-slate-500">
-                  Browse programs supporting new homeowners, including down payment assistance.
-                </p>
-              </li>
             </ul>
           </section>
         </div>

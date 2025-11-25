@@ -221,7 +221,7 @@ export default async function GrantsIndexPage({
                 </Link>
 
                 <Link
-                  href="/resources/first-time-homebuyer-starter-pack"
+                  href="resources/first-time-homebuyer-starter-pack"
                   className="inline-flex items-center justify-center rounded-xl border border-[#FF5A5F] bg-white/80 px-6 py-3 text-sm font-semibold text-[#FF5A5F] shadow-sm backdrop-blur transition hover:bg-[#FF5A5F] hover:text-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF5A5F] focus-visible:ring-offset-2"
                 >
                   Download the 2025 FTHB Toolkit – Only $17

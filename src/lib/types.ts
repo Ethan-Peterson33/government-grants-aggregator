@@ -1,66 +1,82 @@
 export type Grant = {
   id: string;
-  title: string;
-  apply_link: string | null;
 
+  // --- Core identity ---
+  title: string;
+  official_title?: string | null;
+
+  // --- Source & URLs ---
+  apply_link: string | null;
+  official_source_url?: string | null;
+  source_domain?: string | null;
+
+  // --- Classification ---
   category: string | null;
   category_code?: string | null;
+  grant_categories?: {
+    category_code: string;
+    category_label: string;
+    slug: string;
+  } | null;
 
+  type?: string | null;                // old field, keep for compatibility
+  funding_mechanism?: string | null;   // Grant | Forgivable loan | Tax credit | Rebate | Technical assistance...
+
+  // --- Agency ---
   agency: string | null;
   agency_name?: string | null;
   agency_slug?: string | null;
   agency_id?: string | null;
   agency_code?: string | null;
 
-  funding_amount: string | null;
-  amount?: string | null; // ✅ alias for state/local scrapes
+  // --- Location ---
+  state: string | null;
+  city: string | null;
+  geography_scope?: string | null;     // Statewide | County | City | Multi-county | Nationwide
+  eligible_geographies_text?: string | null;
 
-  eligibility: string | null;
+  // --- Money ---
+  award_min?: number | null;
+  award_max?: number | null;
+  award_amount_max?: number | null;
+  award_amount_min?: number | null;
+
+  award_amount_text?: string | null;   // human-friendly display
+  funding_amount?: string | null;      // legacy raw scrape text
+  amount?: string | null;              // legacy
+
+  // --- Status ---
+  status_label?: string | null;        // Open | Rolling | Closed | Upcoming
+  deadline_type?: string | null;       // Fixed | Rolling | Quarterly | Until funds exhausted
   deadline: string | null;
   open_date?: string | null;
   close_date?: string | null;
 
-  state: string | null;
-  city: string | null;
-
+  // --- Descriptive content ---
   summary: string | null;
   description: string | null;
-
-  type?: string | null;          
-  jurisdiction?: string | null;  
-  status?: string | null;        
-
-  scraped_at: string | null;
-  last_verified_at?: string | null;
-  applicant_types?: string[] | null;
-  // ✅ new normalized awards
-  award_amount_min?: number | null;
-  award_amount_max?: number | null;
-  award_amount_text?: string | null;
-
-  award_min?: number | null;
-  award_max?: number | null;
-  complexity?: string | null;
-  required_docs?: string[] | null;
-  official_source_url?: string | null;
-  
-  status_label?: string | null;
-  deadline_type?: string | null;
-  funding_mechanism?: string | null;
-  geography_scope?: string | null;
- 
+  eligibility: string | null;
   benefit_tags?: string[] | null;
-  complexity_label?: string | null;
-  verified_at?: string | null;
-  last_updated_at?: string | null;
-  source_domain?: string | null;
 
-  // 👇 Add this block
-  grant_categories?: {
-    category_code: string;
-    category_label: string;
-    slug: string;
-  } | null;
+  // --- Applicant classification ---
+  applicant_types?: string[] | null;   // Individual | Small business | Nonprofit | Tribal government | etc.
+
+  // --- Complexity / Verification ---
+  complexity_label?: string | null;    // Easy | Moderate | Complex
+  complexity?: string | null;          // legacy fallback
+  required_docs?: string[] | null;
+
+  confidence_score?: number | null;
+  confidence_notes?: string | null;
+
+  // --- Dates (trust + update tracking) ---
+  scraped_at: string | null;           // original scrape timestamp
+  verified_at?: string | null;         // human verified
+  last_verified_at?: string | null;    // legacy from before verified_at
+  last_updated_at?: string | null;     // program change or rewrite date
+
+  // --- Misc legacy ---
+  opportunity_number?: string | null;
 };
 
 

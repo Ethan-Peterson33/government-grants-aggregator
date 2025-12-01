@@ -2,28 +2,58 @@ export type Grant = {
   id: string;
   title: string;
   apply_link: string | null;
+
   category: string | null;
   category_code?: string | null;
+
   agency: string | null;
   agency_name?: string | null;
   agency_slug?: string | null;
   agency_id?: string | null;
+  agency_code?: string | null;
+
   funding_amount: string | null;
+  amount?: string | null; // ✅ alias for state/local scrapes
+
   eligibility: string | null;
   deadline: string | null;
-  state: string | null;
-  city: string | null;
-  summary: string | null;
-  description: string | null;
-  scraped_at: string | null;
-  opportunity_number?: string | null;
-  opportunity_id?: number | null;
-  agency_code?: string | null;
   open_date?: string | null;
   close_date?: string | null;
-  jurisdiction?: string | null;
-  base_type?: string | null;
-  type?: string | null;
+
+  state: string | null;
+  city: string | null;
+
+  summary: string | null;
+  description: string | null;
+
+  type?: string | null;          
+  jurisdiction?: string | null;  
+  status?: string | null;        
+
+  scraped_at: string | null;
+  last_verified_at?: string | null;
+  applicant_types?: string[] | null;
+  // ✅ new normalized awards
+  award_amount_min?: number | null;
+  award_amount_max?: number | null;
+  award_amount_text?: string | null;
+
+  award_min?: number | null;
+  award_max?: number | null;
+  complexity?: string | null;
+  required_docs?: string[] | null;
+  official_source_url?: string | null;
+  
+  status_label?: string | null;
+  deadline_type?: string | null;
+  funding_mechanism?: string | null;
+  geography_scope?: string | null;
+ 
+  benefit_tags?: string[] | null;
+  complexity_label?: string | null;
+  verified_at?: string | null;
+  last_updated_at?: string | null;
+  source_domain?: string | null;
 
   // 👇 Add this block
   grant_categories?: {

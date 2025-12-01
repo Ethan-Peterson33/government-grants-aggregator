@@ -614,13 +614,11 @@ export async function getGrantById(id: string): Promise<Grant | null> {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   const isUuid = (value: string) => UUID_PATTERN.test(value);
-
-  const normalizeGrantId = (rawId: string): string | null => {
-    if (!rawId) return null;
-    const cleaned = rawId.replace(/-\d+$/, "");
-    return isUuid(cleaned) ? cleaned : null;
-  };
-
+const normalizeGrantId = (rawId: string): string | null => {
+  if (!rawId) return null;
+  const cleaned = rawId.trim();
+  return UUID_PATTERN.test(cleaned) ? cleaned : null;
+};
   const normalizedId = normalizeGrantId(id);
   if (!normalizedId) {
     return await getGrantByShortId(id.split("-")[0]);

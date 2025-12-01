@@ -34,6 +34,7 @@ export type Grant = {
   city: string | null;
   geography_scope?: string | null;     // Statewide | County | City | Multi-county | Nationwide
   eligible_geographies_text?: string | null;
+  jurisdiction?: string | null; 
 
   // --- Money ---
   award_min?: number | null;

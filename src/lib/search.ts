@@ -389,38 +389,45 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
   const category = toComparable(filters.category);
   if (category && !textIncludes(grant.category, category)) return false;
 
-  const normalizedJurisdiction = (grant.jurisdiction || grant.base_type || grant.type || "")
-    .toString()
-    .trim()
-    .toLowerCase();
+  // Normalize jurisdiction (new fields only!)
+  const normalizedJurisdiction = (grant.jurisdiction || grant.type || "").toLowerCase().trim();
 
   const location = inferGrantLocation(grant);
   const filterStateCode = normalizeStateCode(filters.stateCode ?? undefined);
 
+  // Private filter: must match exactly
   if (filters.jurisdiction === "private") {
     if (normalizedJurisdiction !== "private" && location.jurisdiction !== "private") return false;
   }
 
+  // State code filter
   if (filterStateCode) {
+    // Exclude federal/private
     if (location.jurisdiction === "federal" || location.jurisdiction === "private") return false;
     if (location.stateCode.toUpperCase() !== filterStateCode) return false;
   }
 
+  // Direct jurisdiction filter
   if (filters.jurisdiction && location.jurisdiction !== filters.jurisdiction) return false;
 
+  // State filter
   const state = toComparable(filters.state);
   if (state && !textIncludes(grant.state, state)) return false;
 
+  // City filter
   const cityFilter = toComparable(filters.city);
   if (cityFilter && !textIncludes(grant.city, cityFilter)) return false;
 
+  // Agency filter
   const agency = toComparable(filters.agency);
   if (agency && !textIncludes(grant.agency, agency)) return false;
 
+  // Apply-link filter
   if (filters.hasApplyLink && !grant.apply_link) return false;
 
   return true;
 }
+
 
 export function filterGrantsLocally(
   grants: Grant[],

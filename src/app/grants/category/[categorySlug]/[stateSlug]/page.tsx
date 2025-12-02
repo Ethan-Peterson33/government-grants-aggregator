@@ -2,15 +2,22 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/grants/breadcrumb";
-import { GrantCard } from "@/components/grants/grant-card";
+import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { categoryStateCopy } from "@/content/categoryStateCopy";
-import { resolveRouteParams } from "@/app/grants/_components/route-params";
-import { resolveStateParam, stateNameCandidatesFromCode } from "@/lib/grant-location";
+import {
+  resolveRouteParams,
+  resolveSearchParams,
+  extractSearchParam,
+  type SearchParamsLike,
+} from "@/app/grants/_components/route-params";
+import { resolveStateParam } from "@/lib/grant-location";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Grant } from "@/lib/types";
+import type { FilterOption } from "@/components/grants/filters-bar";
+import type { GrantFilters } from "@/lib/types";
 import { wordsFromSlug } from "@/lib/strings";
+import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 12;
 
 
 type Params = { categorySlug: string; stateSlug: string };
@@ -45,27 +52,6 @@ async function loadCategory(categorySlug: string): Promise<CategoryRecord | null
   return data ?? null;
 }
 
-function buildStateCandidates(code: string, name: string) {
-  const values = new Set<string>();
-  if (code) {
-    values.add(code);
-    values.add(code.toUpperCase());
-    values.add(code.toLowerCase());
-  }
-
-  const normalizedName = wordsFromSlug(name) || name;
-  if (normalizedName) {
-    values.add(normalizedName);
-    values.add(normalizedName.toUpperCase());
-  }
-
-  for (const candidate of stateNameCandidatesFromCode(code)) {
-    values.add(candidate);
-  }
-
-  return Array.from(values).filter(Boolean);
-}
-
 async function loadContext(params: Params): Promise<PageContext | null> {
   const category = await loadCategory(params.categorySlug);
   const stateInfo = resolveStateParam(params.stateSlug);
@@ -75,32 +61,6 @@ async function loadContext(params: Params): Promise<PageContext | null> {
   }
 
   return { category, state: stateInfo, stateSlug: params.stateSlug };
-}
-
-async function loadCategoryStateGrants(category: CategoryRecord, state: { code: string; name: string }) {
-  const supabase = createServerSupabaseClient();
-  if (!supabase) return [];
-
-  const stateCandidates = buildStateCandidates(state.code, state.name);
-
-  let query = supabase
-    .from("grants")
-    .select("*")
-    .eq("category_code", category.category_code)
-    .in("state", stateCandidates)
-    .order("scraped_at", { ascending: false })
-    .limit(PAGE_SIZE);
-
-  query = query.or("active.is.null,active.eq.true");
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("[category-state] Error loading grants", { category: category.slug, state: state.code, error });
-    return [];
-  }
-
-  return (data ?? []) as Grant[];
 }
 
 function buildCopy(context: PageContext) {
@@ -192,15 +152,71 @@ export async function generateMetadata({ params }: { params: Params | Promise<Pa
 }
 
 
-export default async function CategoryStatePage({ params }: { params: Params | Promise<Params> }) {
+export default async function CategoryStatePage({
+  params,
+  searchParams,
+}: {
+  params: Params | Promise<Params>;
+  searchParams?:
+    | URLSearchParams
+    | Record<string, string | string[] | undefined>
+    | Promise<URLSearchParams | Record<string, string | string[] | undefined>>;
+}) {
   const resolvedParams = await resolveRouteParams(params, "category-state.page");
+  const resolvedSearch = (await resolveSearchParams(searchParams, "category-state.page")) as
+    | SearchParamsLike
+    | undefined;
+
   if (!resolvedParams) return notFound();
 
   const context = await loadContext(resolvedParams);
   if (!context) return notFound();
 
+  const page = safeNumber(extractSearchParam(resolvedSearch, "page") ?? undefined, 1);
+  const pageSize = Math.min(50, safeNumber(extractSearchParam(resolvedSearch, "pageSize") ?? undefined, PAGE_SIZE));
+
+  const keywordParam = extractSearchParam(resolvedSearch, "keyword");
+  const legacyQueryParam = extractSearchParam(resolvedSearch, "query");
+  const query = keywordParam ?? legacyQueryParam;
+
+  const agency = extractSearchParam(resolvedSearch, "agency");
+  const hasApplyLink = extractSearchParam(resolvedSearch, "has_apply_link") === "1";
+
+  const jurisdictionParam = extractSearchParam(resolvedSearch, "jurisdiction");
+  const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local", "private"];
+  const jurisdiction = allowedJurisdictions.includes(jurisdictionParam as GrantFilters["jurisdiction"])
+    ? (jurisdictionParam as GrantFilters["jurisdiction"])
+    : undefined;
+
+  const filters: GrantFilters = {
+    page,
+    pageSize,
+    query,
+    category: context.category.slug,
+    state: context.state.code,
+    stateCode: context.state.code,
+    agency,
+    hasApplyLink,
+    jurisdiction,
+  };
+
+  const [{ grants, total, totalPages }, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
+
+  const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
+    label: `${item.label} (${item.grantCount})`,
+    value: item.slug,
+  }));
+
+  const stateOptions: FilterOption[] = [
+    { label: context.state.name, value: context.state.code },
+  ];
+
+  const agencyOptions: FilterOption[] = facets.agencies.map((facet) => ({
+    label: `${facet.label} (${facet.grantCount})`,
+    value: facet.value,
+  }));
+
   const { heading, intro, categoryLabel } = buildCopy(context);
-  const grants = await loadCategoryStateGrants(context.category, context.state);
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -271,37 +287,38 @@ export default async function CategoryStatePage({ params }: { params: Params | P
 
           {/* Meta / trust line */}
           <p className="category-state-hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
-            {grants.length > 0
-              ? `${grants.length.toLocaleString()} active program${
-                  grants.length === 1 ? "" : "s"
-                } in ${context.state.name}`
+            {total > 0
+              ? `${total.toLocaleString()} active program${total === 1 ? "" : "s"} in ${context.state.name}`
               : `No active programs found yet in ${context.state.name} — new grants added weekly.`}
           </p>
         </div>
       </header>
 
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            {grants.length > 0
-              ? `${grants.length} grant${grants.length === 1 ? "" : "s"} available`
-              : "No grants found for this category and state combination yet."}
-          </p>
-        </div>
-
-        {grants.length > 0 ? (
-          <div className="grid gap-4">
-            {grants.map((grant) => (
-              <GrantCard key={grant.id} grant={grant} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-slate-700">
-            <p>
-              We couldn&apos;t find any active grants for this category in {context.state.name} yet. Try exploring statewide grants or a different focus area.
-            </p>
-          </div>
-        )}
+      <section id="category-state-list" className="space-y-6">
+        <GrantsSearchClient
+          initialFilters={{
+            query: query ?? "",
+            category: context.category.slug,
+            state: context.state.code,
+            agency: agency ?? "",
+            hasApplyLink,
+            page,
+            pageSize,
+          }}
+          initialResults={{ grants, total, page, pageSize, totalPages }}
+          categories={categoryOptions}
+          states={stateOptions}
+          agencies={agencyOptions}
+          lockedFilters={{
+            category: context.category.slug,
+            state: context.state.code,
+          }}
+          staticParams={{
+            categorySlug: context.category.slug,
+            stateSlug: context.stateSlug,
+          }}
+          showStateFilter={false}
+        />
       </section>
     </div>
   );

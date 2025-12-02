@@ -135,13 +135,17 @@ export function GrantsSearchClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const basePath = useMemo(
-    () =>
-      staticParams?.categorySlug
-        ? `/grants/category/${staticParams.categorySlug}`
-        : pathname || "/grants",
-    [pathname, staticParams?.categorySlug]
-  );
+  const basePath = useMemo(() => {
+    if (staticParams?.categorySlug && staticParams?.stateSlug) {
+      return `/grants/category/${staticParams.categorySlug}/${staticParams.stateSlug}`;
+    }
+
+    if (staticParams?.categorySlug) {
+      return `/grants/category/${staticParams.categorySlug}`;
+    }
+
+    return pathname || "/grants";
+  }, [pathname, staticParams?.categorySlug, staticParams?.stateSlug]);
 
   /* -----------------------------------------
      LOCKED FILTER VALUES

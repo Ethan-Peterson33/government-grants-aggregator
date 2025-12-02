@@ -96,7 +96,7 @@ const serializeFilters = (
   const p = new URLSearchParams();
   const { additionalParams, locked } = opts ?? {};
 
-  if (!(locked?.category) && filters.category) {
+  if (filters.category) {
     p.set("category", filters.category);
   }
 
@@ -135,6 +135,17 @@ export function GrantsSearchClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const basePath = useMemo(() => {
+    if (staticParams?.categorySlug && staticParams?.stateSlug) {
+      return `/grants/category/${staticParams.categorySlug}/${staticParams.stateSlug}`;
+    }
+
+    if (staticParams?.categorySlug) {
+      return `/grants/category/${staticParams.categorySlug}`;
+    }
+
+    return pathname || "/grants";
+  }, [pathname, staticParams?.categorySlug, staticParams?.stateSlug]);
 
   /* -----------------------------------------
      LOCKED FILTER VALUES
@@ -175,7 +186,7 @@ export function GrantsSearchClient({
 
   const initialUrlState = useMemo(
     () => parseUrl(searchParams),
-    []
+    [parseUrl, searchParams]
   );
 
   /* -----------------------------------------
@@ -240,11 +251,11 @@ export function GrantsSearchClient({
         locked: lockedFilterValues,
       });
 
-      router.replace(sp.toString() ? `${pathname}?${sp}` : pathname, {
+      router.replace(sp.toString() ? `${basePath}?${sp}` : basePath, {
         scroll: false,
       });
     },
-    [pathname, router, additionalParams, lockedFilterValues]
+    [basePath, router, additionalParams, lockedFilterValues]
   );
 
   /* -----------------------------------------
@@ -314,7 +325,30 @@ export function GrantsSearchClient({
         skipUrl: true,
       });
     }
-  }, [searchParams]);
+  }, [filters, page, pageSize, parseUrl, performSearch, searchParams]);
+
+  const effectiveFilters = useMemo(
+    () => mergeLocked(filters),
+    [filters, mergeLocked]
+  );
+
+  const createPageHref = useCallback(
+    (targetPage: number) => {
+      const params = new URLSearchParams();
+
+      params.set("page", String(targetPage));
+
+      if (effectiveFilters.query) params.set("keyword", effectiveFilters.query);
+      if (effectiveFilters.state) params.set("state", effectiveFilters.state);
+      if (effectiveFilters.agency) params.set("agency", effectiveFilters.agency);
+      if (effectiveFilters.hasApplyLink) params.set("has_apply_link", "1");
+      if (effectiveFilters.category) params.set("category", effectiveFilters.category);
+
+      const queryString = params.toString();
+      return queryString ? `${basePath}?${queryString}` : basePath;
+    },
+    [basePath, effectiveFilters]
+  );
 
   /* -----------------------------------------
      FILTERBAR CHANGE
@@ -432,6 +466,7 @@ export function GrantsSearchClient({
           pageSize={pageSize}
           currentPage={page}
           onPageChange={handlePageChange}
+          getHref={createPageHref}
           isLoading={isLoading}
         />
       )}

@@ -307,7 +307,12 @@ export default async function CategoryGrantsPage({
         categories={categoryOptions}
         states={stateOptions}
         agencies={agencyOptions}
-        lockedFilters={undefined}
+        lockedFilters={{
+          category: categorySlug,
+        }}
+        staticParams={{
+          categorySlug,
+        }}
       />
 
       <script

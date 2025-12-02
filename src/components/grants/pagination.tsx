@@ -3,38 +3,19 @@
 "use client";
 
 import Link from "next/link";
-import React from "react";
+import React, { useMemo } from "react";
 
-interface PaginationBaseProps {
+interface PaginationProps {
   total: number;
   pageSize: number;
   currentPage: number;
   isLoading?: boolean;
-}
-
-type PaginationLinkProps = PaginationBaseProps & {
-  basePath: string;
+  basePath?: string;
   rawCategory?: string;
   staticParams?: Record<string, string | undefined>;
-  onPageChange?: undefined;
-  getHref?: undefined;
-};
-
-type PaginationCallbackProps = PaginationBaseProps & {
-  onPageChange: (page: number) => void;
-  basePath?: undefined;
-  rawCategory?: undefined;
-  getHref?: undefined;
-};
-
-type PaginationHrefProps = PaginationBaseProps & {
-  getHref: (page: number) => string;
-  onPageChange?: undefined;
-  basePath?: undefined;
-  rawCategory?: undefined;
-};
-
-type PaginationProps = PaginationLinkProps | PaginationCallbackProps | PaginationHrefProps;
+  onPageChange?: (page: number) => void;
+  getHref?: (page: number) => string;
+}
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -87,51 +68,25 @@ const getPageItems = (
 };
 
 const Pagination: React.FC<PaginationProps> = (props) => {
-  const { total, pageSize, currentPage, isLoading } = props;
+  const {
+    total,
+    pageSize,
+    currentPage,
+    isLoading,
+    onPageChange,
+    basePath,
+    rawCategory,
+    staticParams,
+    getHref,
+  } = props;
   const safePageSize = pageSize > 0 ? pageSize : 1;
   const totalPages = Math.ceil(total / safePageSize);
 
-  if (totalPages <= 1) {
-    return null;
-  }
+  const buildHref = useMemo(() => {
+    if (typeof getHref === "function") return getHref;
 
-  const pageItems = getPageItems(totalPages, currentPage);
-
-  if ("onPageChange" in props && typeof props.onPageChange === "function") {
-    const handlePageChange = props.onPageChange;
-    return (
-      <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
-        {pageItems.map((item, index) => {
-          if (item === "ellipsis") {
-            return (
-              <span key={`ellipsis-${index}`} className="px-3 py-1 text-slate-500">
-                …
-              </span>
-            );
-          }
-
-          const pageNum = item;
-          const isActive = pageNum === currentPage;
-          return (
-            <button
-              key={pageNum}
-              type="button"
-              onClick={() => handlePageChange(pageNum)}
-              disabled={isActive || isLoading}
-              className={buttonClasses(isActive)}
-            >
-              {pageNum}
-            </button>
-          );
-        })}
-      </nav>
-    );
-  }
-
-  const buildHref = "getHref" in props && typeof props.getHref === "function"
-    ? props.getHref
-    : (page: number) => {
-        const { basePath, rawCategory, staticParams } = props as PaginationLinkProps;
+    if (basePath) {
+      return (page: number) => {
         const params = new URLSearchParams();
         if (staticParams) {
           Object.entries(staticParams).forEach(([key, value]) => {
@@ -152,6 +107,16 @@ const Pagination: React.FC<PaginationProps> = (props) => {
         const query = params.toString();
         return query ? `${basePath}?${query}` : basePath;
       };
+    }
+
+    return undefined;
+  }, [basePath, getHref, pageSize, rawCategory, staticParams]);
+
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  const pageItems = getPageItems(totalPages, currentPage);
 
   return (
     <nav aria-label="Pagination" className="mt-6 flex justify-center space-x-2">
@@ -165,17 +130,43 @@ const Pagination: React.FC<PaginationProps> = (props) => {
         }
 
         const pageNum = item;
-        const href = buildHref(pageNum);
         const isActive = pageNum === currentPage;
+
+        if (buildHref) {
+          const href = buildHref(pageNum);
+
+          const handleLinkClick = onPageChange
+            ? (event: React.MouseEvent) => {
+                event.preventDefault();
+                if (!isActive && !isLoading) {
+                  onPageChange(pageNum);
+                }
+              }
+            : undefined;
+
+          return (
+            <Link
+              key={pageNum}
+              href={href}
+              onClick={handleLinkClick}
+              className={buttonClasses(isActive)}
+              aria-current={isActive ? "page" : undefined}
+            >
+              {pageNum}
+            </Link>
+          );
+        }
+
         return (
-          <Link
+          <button
             key={pageNum}
-            href={href}
+            type="button"
+            onClick={() => onPageChange?.(pageNum)}
+            disabled={isActive || isLoading}
             className={buttonClasses(isActive)}
-            aria-current={isActive ? "page" : undefined}
           >
             {pageNum}
-          </Link>
+          </button>
         );
       })}
     </nav>

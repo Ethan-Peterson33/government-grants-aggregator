@@ -230,7 +230,7 @@ export default async function GrantsIndexPage({
 
               {/* Trust line */}
               <p className="hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
-                1800+ programs listed • Verified by HUD &amp; state
+                1900+ programs listed • Verified by HUD &amp; state
                 agencies
               </p>
 

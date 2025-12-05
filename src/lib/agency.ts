@@ -16,7 +16,13 @@ export type AgencyRow = {
 };
 
 export function escapeIlike(value: string): string {
-  return value.replace(/[%_]/g, (match) => `\\${match}`).replace(/'/g, "''");
+  return value
+    .replace(/\\/g, "\\\\")   // backslashes first!
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/,/g, "\\,");
 }
 
 const SCOPE_DEFAULT = "agency.lookup";

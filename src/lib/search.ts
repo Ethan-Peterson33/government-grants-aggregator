@@ -220,35 +220,53 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       q = q.ilike("city", `%${sanitizedCity}%`);
     }
 
-    /** ------------------------------
-     * AGENCY FILTERS
-     * ------------------------------*/
-    const agencyClauses: string[] = [];
+/** ------------------------------
+ * AGENCY FILTERS (SAFE VERSION)
+ * ------------------------------*/
+if (sanitizedAgency || sanitizedAgencyCode || sanitizedAgencySlug) {
+  // --------------------------------------
+  // 1. Direct agency name match
+  // --------------------------------------
+  if (sanitizedAgency) {
+    const escaped = escapeIlike(sanitizedAgency);
+    q = q.or(`agency.ilike.%${escaped}%,agency_name.ilike.%${escaped}%`, {
+      foreignTable: null,
+    });
+  }
 
-    if (sanitizedAgency) {
-      agencyClauses.push(`agency.ilike.%${escapeIlike(sanitizedAgency)}%`);
-      agencyClauses.push(`agency_name.ilike.%${escapeIlike(sanitizedAgency)}%`);
+  // --------------------------------------
+  // 2. Agency code match (slug-like codes)
+  // --------------------------------------
+  if (sanitizedAgencyCode) {
+    const { codeCandidates } = agencySlugCandidates(sanitizedAgencyCode);
+
+    for (const code of codeCandidates) {
+      const escaped = escapeIlike(code);
+      q = q.or(`agency_code.ilike.%${escaped}%`, { foreignTable: null });
+    }
+  }
+
+  // --------------------------------------
+  // 3. Agency slug match + derived name fragment
+  // --------------------------------------
+  if (sanitizedAgencySlug) {
+    const { codeCandidates, nameFragment } =
+      agencySlugCandidates(sanitizedAgencySlug);
+
+    for (const code of codeCandidates) {
+      const escaped = escapeIlike(code);
+      q = q.or(`agency_code.ilike.%${escaped}%`, { foreignTable: null });
     }
 
-    if (sanitizedAgencyCode) {
-      const codeCandidates = agencySlugCandidates(sanitizedAgencyCode);
-      for (const code of codeCandidates.codeCandidates) {
-        agencyClauses.push(`agency_code.ilike.%${escapeIlike(code)}%`);
-      }
+    if (nameFragment) {
+      const escaped = escapeIlike(nameFragment);
+      q = q.or(
+        `agency_name.ilike.%${escaped}%,agency.ilike.%${escaped}%`,
+        { foreignTable: null }
+      );
     }
-
-    if (sanitizedAgencySlug) {
-      const slugCandidates = agencySlugCandidates(sanitizedAgencySlug);
-      for (const code of slugCandidates.codeCandidates) {
-        agencyClauses.push(`agency_code.ilike.%${escapeIlike(code)}%`);
-      }
-      if (slugCandidates.nameFragment) {
-        const frag = escapeIlike(slugCandidates.nameFragment);
-        agencyClauses.push(`agency_name.ilike.%${frag}%`);
-        agencyClauses.push(`agency.ilike.%${frag}%`);
-      }
-    }
-
+  }
+}
     if (agencyClauses.length > 0) {
       q = q.or(agencyClauses.join(","));
     }

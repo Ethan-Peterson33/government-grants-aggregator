@@ -66,8 +66,11 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const normalizedState = resolveStateQueryValue(rawStateFilter);
   const sanitizedState = like(normalizedState.value || filters.state);
   const sanitizedCity = like(filters.city);
- const sanitizedAgency = filters.agency ? escapeIlike(filters.agency) : undefined;
 
+  // ⭐ IMPORTANT: Pre-escaped once, safely
+  const sanitizedAgency = typeof filters.agency === "string"
+    ? escapeIlike(filters.agency)
+    : undefined;
 
   const sanitizedAgencySlug =
     typeof filters.agencySlug === "string" && filters.agencySlug.trim().length > 0
@@ -80,47 +83,34 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       : undefined;
 
   const stateCode = normalizeStateCode(
-    filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined,
+    filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined
   );
-  const hasApplyLink = filters.hasApplyLink === true;
 
+  const hasApplyLink = filters.hasApplyLink === true;
+  const jurisdiction = filters.jurisdiction ?? normalizedState.jurisdiction ?? undefined;
   const isFederalStateFilter = normalizedState.jurisdiction === "federal";
 
-  const jurisdiction = filters.jurisdiction ?? normalizedState.jurisdiction ?? undefined;
-
-  /** ------------------------------
-   * CATEGORY CODE RESOLUTION
-   * ------------------------------*/
+  /** CATEGORY LOOKUP **/
   let categoryCodes: string[] = [];
   const shouldFilterByCategory = rawCategoryFilter.length > 0;
 
   if (shouldFilterByCategory) {
     const slugFilters = Array.from(
-      new Set(
-        [
-          slugCandidate,
-          rawCategoryFilter.toLowerCase(),
-          // FTHB category records are stored as "first-time-homeowner" but the UI can
-          // generate a slug with a trailing "-grants". Include a suffix-stripped
-          // variant so the Supabase lookup still resolves to category_code = "FTHB".
-          slugCandidate.replace(/-grants?$/, ""),
-        ]
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0),
-      ),
+      new Set([
+        slugCandidate,
+        rawCategoryFilter.toLowerCase(),
+        slugCandidate.replace(/-grants?$/, ""),
+      ])
     );
 
-    if (slugFilters.length > 0) {
-      const { data: slugMatches } = await supabase
-        .from("grant_categories")
-        .select("category_code")
-        .in("slug", slugFilters)
-        .limit(25);
+    const { data: slugMatches } = await supabase
+      .from("grant_categories")
+      .select("category_code")
+      .in("slug", slugFilters);
 
-      categoryCodes = (slugMatches ?? [])
-        .map((entry) => entry?.category_code)
-        .filter((code): code is string => typeof code === "string" && code.trim().length > 0);
-    }
+    categoryCodes = (slugMatches ?? [])
+      .map((x) => x?.category_code)
+      .filter((x): x is string => typeof x === "string" && x.length > 0);
 
     if (categoryCodes.length === 0) {
       const pattern = `%${escapeIlike(rawCategoryFilter)}%`;
@@ -130,226 +120,146 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
         .ilike("category_label", pattern);
 
       categoryCodes = (data ?? [])
-        .map((c) => c?.category_code)
-        .filter((code): code is string => typeof code === "string" && code.trim().length > 0);
+        .map((x) => x?.category_code)
+        .filter((x): x is string => typeof x === "string" && x.length > 0);
     }
   }
 
   console.log("➡️ Final grant query filters", {
     sanitizedQuery,
-    categoryFilter: rawCategoryFilter,
-    sanitizedState,
-    sanitizedCity,
     sanitizedAgency,
     sanitizedAgencySlug,
     sanitizedAgencyCode,
-    stateCode,
+    sanitizedState,
+    sanitizedCity,
+    categoryCodes,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
     page,
     pageSize,
-    range: { from, to },
-    categoryCodes,
   });
 
-  /** ------------------------------------------------------------------
-   *  EXECUTION LOOP (only one table today)
-   * -----------------------------------------------------------------*/
+  /** ----------------------------------------------
+   * EXECUTION LOOP (only "grants" today)
+   * ---------------------------------------------*/
   for (const table of TABLE_FALLBACK_ORDER) {
-    const { hasStateColumn = false, hasCityColumn = false, hasJurisdictionColumn = false } =
-      TABLE_FEATURES[table] ?? {};
+    const { hasStateColumn = true, hasCityColumn = true } = TABLE_FEATURES[table];
 
-    /** ------------------------------
-     * STATE CLAUSES
-     * ------------------------------*/
-    const stateClauses: string[] = [];
-
-    if (stateCode && hasStateColumn) {
-      const candidates = new Set<string>([stateCode, ...stateNameCandidatesFromCode(stateCode)]);
-      for (const candidate of candidates) {
-        const sanitized = escapeIlike(candidate);
-        stateClauses.push(`state.ilike.%${sanitized}%`);
-      }
-    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
-      stateClauses.push(`state.ilike.%${sanitizedState}%`);
-    }
-
-    /** ------------------------------
-     * BUILD BASE QUERY (q created FIRST!)
-     * ------------------------------*/
+    /** -------------------- Base Query -------------------- */
     let q = supabase
       .from(table)
       .select("*", { count: "exact" })
       .order("scraped_at", { ascending: false })
       .range(from, to);
 
-    /** ------------------------------------------------------------------
-     *  NOW we can safely define applyStateClauses()
-     * -----------------------------------------------------------------*/
-    const applyStateClauses = () => {
-      if (stateClauses.length === 0) return;
-      console.log("🌎 State filter:", { table, stateCode, clauses: stateClauses });
-      q = q.or(stateClauses.join(","));
-    };
-
-    /** ------------------------------
-     * KEYWORD SEARCH
-     * ------------------------------*/
+    /** -------------------- Keyword Search -------------------- */
     if (sanitizedQuery) {
-      const queryOrClauses = ["title", "summary", "description"].map(
-        (field) => `${field}.ilike.%${sanitizedQuery}%`
-      );
-      q = q.or(queryOrClauses.join(","));
+      const clauses = [
+        `title.ilike.%${sanitizedQuery}%`,
+        `summary.ilike.%${sanitizedQuery}%`,
+        `description.ilike.%${sanitizedQuery}%`,
+      ];
+      q = q.or(clauses.join(","));
     }
 
-    /** ------------------------------
-     * CATEGORY FILTER
-     * ------------------------------*/
+    /** -------------------- Category Filter -------------------- */
     if (shouldFilterByCategory) {
-      if (categoryCodes.length > 0) {
-        q = q.in("category_code", categoryCodes);
-      } else {
-        q = q.eq("category_code", "__none__"); // forces no results
-      }
+      q = categoryCodes.length > 0
+        ? q.in("category_code", categoryCodes)
+        : q.eq("category_code", "__none__"); // no results fallback
     }
 
-    /** ------------------------------
-     * CITY FILTER
-     * ------------------------------*/
+    /** -------------------- City Filter -------------------- */
     if (sanitizedCity && hasCityColumn && jurisdiction !== "private") {
       q = q.ilike("city", `%${sanitizedCity}%`);
     }
 
-/** ------------------------------
- * AGENCY FILTERS (SAFE VERSION)
- * ------------------------------*/
-if (sanitizedAgency || sanitizedAgencyCode || sanitizedAgencySlug) {
-  // --------------------------------------
-  // 1. Direct agency name match
-  // --------------------------------------
-  if (sanitizedAgency) {
-    const escaped = escapeIlike(sanitizedAgency);
-    q = q.or(`agency.ilike.%${escaped}%,agency_name.ilike.%${escaped}%`, {
-      foreignTable: null,
-    });
-  }
+    /** ======================================================
+     *              ⭐⭐⭐ AGENCY FILTERS ⭐⭐⭐
+     * ======================================================*/
 
-  // --------------------------------------
-  // 2. Agency code match (slug-like codes)
-  // --------------------------------------
-  if (sanitizedAgencyCode) {
-    const { codeCandidates } = agencySlugCandidates(sanitizedAgencyCode);
-
-    for (const code of codeCandidates) {
-      const escaped = escapeIlike(code);
-      q = q.or(`agency_code.ilike.%${escaped}%`, { foreignTable: null });
-    }
-  }
-
-  // --------------------------------------
-  // 3. Agency slug match + derived name fragment
-  // --------------------------------------
-  if (sanitizedAgencySlug) {
-    const { codeCandidates, nameFragment } =
-      agencySlugCandidates(sanitizedAgencySlug);
-
-    for (const code of codeCandidates) {
-      const escaped = escapeIlike(code);
-      q = q.or(`agency_code.ilike.%${escaped}%`, { foreignTable: null });
+    // 1. Filters from text name
+    if (sanitizedAgency) {
+      const esc = escapeIlike(sanitizedAgency);
+      q = q.or(`agency.ilike.%${esc}%,agency_name.ilike.%${esc}%`);
     }
 
-    if (nameFragment) {
-      const escaped = escapeIlike(nameFragment);
-      q = q.or(
-        `agency_name.ilike.%${escaped}%,agency.ilike.%${escaped}%`,
-        { foreignTable: null }
-      );
-    }
-  }
-}
-    if (agencyClauses.length > 0) {
-      q = q.or(agencyClauses.join(","));
+    // 2. Filters from numeric/code/slug-like code
+    if (sanitizedAgencyCode) {
+      const { codeCandidates } = agencySlugCandidates(sanitizedAgencyCode);
+      for (const code of codeCandidates) {
+        const esc = escapeIlike(code);
+        q = q.or(`agency_code.ilike.%${esc}%`);
+      }
     }
 
-    /** ------------------------------
-     * APPLY LINK FILTER
-     * ------------------------------*/
+    // 3. Filters from agency slug → codes + name fragments
+    if (sanitizedAgencySlug) {
+      const { codeCandidates, nameFragment } =
+        agencySlugCandidates(sanitizedAgencySlug);
+
+      for (const code of codeCandidates) {
+        const esc = escapeIlike(code);
+        q = q.or(`agency_code.ilike.%${esc}%`);
+      }
+
+      if (nameFragment) {
+        const esc = escapeIlike(nameFragment);
+        q = q.or(`agency_name.ilike.%${esc}%,agency.ilike.%${esc}%`);
+      }
+    }
+
+    /** -------------------- Apply Link Filter -------------------- */
     if (hasApplyLink) {
       q = q.not("apply_link", "is", null);
     }
 
-    /** ------------------------------------------------------------------
-     * JURISDICTION FILTERS (CLEAN + NON-DUPLICATE)
-     * -----------------------------------------------------------------*/
+    /** -------------------- Jurisdiction Filters -------------------- */
+    const stateClauses: string[] = [];
 
-    /** ---------- FEDERAL ----------*/
+    if (stateCode && hasStateColumn) {
+      for (const candidate of [stateCode, ...stateNameCandidatesFromCode(stateCode)]) {
+        stateClauses.push(`state.ilike.%${escapeIlike(candidate)}%`);
+      }
+    } else if (sanitizedState && !isFederalStateFilter && hasStateColumn) {
+      stateClauses.push(`state.ilike.%${sanitizedState}%`);
+    }
+
+    const applyStateClauses = () => {
+      if (stateClauses.length > 0) {
+        q = q.or(stateClauses.join(","));
+      }
+    };
+
     if (jurisdiction === "federal") {
-      const orClauses: string[] = [
+      const fed = [
         "state.is.null",
         "state.eq.''",
         "type.eq.federal",
         "type.ilike.federal",
-        "base_type.eq.federal",
-        "base_type.ilike.federal",
       ];
-
-      for (const label of FEDERAL_STATE_LABELS) {
-        orClauses.push(`state.ilike.%${escapeIlike(label)}%`);
+      for (const lbl of FEDERAL_STATE_LABELS) {
+        fed.push(`state.ilike.%${escapeIlike(lbl)}%`);
       }
-
-      q = q.or(orClauses.join(","));
-    }
-
-    /** ---------- SIMPLE STATE FILTER (include ALL grants in that state) ---------- */
-    else if (jurisdiction === "state" && hasStateColumn) {
-      if (stateClauses.length === 0) {
-        // No valid state filter → nothing to apply
-        continue;
+      q = q.or(fed.join(","));
+    } else if (jurisdiction === "state") {
+      if (stateClauses.length > 0) {
+        q = q.or(stateClauses.join(","));
       }
-
-      console.log("🗺️ Applying simple state filter (include ALL grants with this state)", {
-        table,
-        clauses: stateClauses,
-      });
-
-      // Just match the state. No city filters at all.
-      q = q.or(stateClauses.join(","));
-    }
-
-    /** ---------- PRIVATE ----------*/
-    else if (jurisdiction === "private") {
-      if (hasJurisdictionColumn) {
-        q = q.eq("jurisdiction", "private");
-      }
-      // Skip all locality/state filters for private grants.
-    }
-
-    /** ---------- LOCAL ----------*/
-    else if (jurisdiction === "local" && hasCityColumn) {
+    } else if (jurisdiction === "local") {
       applyStateClauses();
       q = q.not("city", "is", null).not("city", "eq", "");
-      for (const label of STATEWIDE_CITY_LABELS) {
-        q = q.not("city", "ilike", `%${escapeIlike(label)}%`);
-      }
-    }
-
-    /** ---------- NO JURISDICTION FILTER ----------*/
-    else {
+    } else if (jurisdiction === "private") {
+      q = q.eq("jurisdiction", "private");
+    } else {
       applyStateClauses();
     }
 
-    console.log("🧩 Query snapshot:", {
-      jurisdiction,
-      queryObject: q,
-    });
-
-    /** ------------------------------------------------------------------
-     * EXECUTE SUPABASE QUERY
-     * -----------------------------------------------------------------*/
-    const { data, error, count } = (await q) as unknown as {
+    /** -------------------- Execute Query -------------------- */
+    const { data, count, error } = (await q) as {
       data: Grant[] | null;
-      error: PostgrestError | null;
       count: number | null;
+      error: PostgrestError | null;
     };
 
     if (error) {
@@ -357,16 +267,13 @@ if (sanitizedAgency || sanitizedAgencyCode || sanitizedAgencySlug) {
       break;
     }
 
-    /** Transform results (slug fallback) */
     const grants = (data ?? []).map((grant) => {
       const agencyName = grant.agency_name ?? grant.agency ?? null;
       const fallbackSlug = deriveAgencySlug({
         slug: grant.agency_slug ?? undefined,
         agency_code: grant.agency_code ?? undefined,
         agency_name: agencyName,
-        agency: grant.agency ?? undefined,
       });
-
       return {
         ...grant,
         agency: agencyName,
@@ -375,19 +282,18 @@ if (sanitizedAgency || sanitizedAgencyCode || sanitizedAgencySlug) {
       };
     });
 
-    const total = count ?? grants.length;
-
     return {
       grants,
-      total,
+      total: count ?? grants.length,
       page,
       pageSize,
-      totalPages: total ? Math.ceil(total / pageSize) : 0,
+      totalPages: count ? Math.ceil(count / pageSize) : 0,
     };
   }
 
   return { grants: [], total: 0, page, pageSize, totalPages: 0 };
 }
+
 
 /** ------------------------------------------------------------------
  * LOCAL FILTERING HELPERS (unchanged)

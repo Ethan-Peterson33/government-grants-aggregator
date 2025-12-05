@@ -66,7 +66,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
   const normalizedState = resolveStateQueryValue(rawStateFilter);
   const sanitizedState = like(normalizedState.value || filters.state);
   const sanitizedCity = like(filters.city);
-  const sanitizedAgency = like(filters.agency);
+ const sanitizedAgency = filters.agency ? escapeIlike(filters.agency) : undefined;
+
 
   const sanitizedAgencySlug =
     typeof filters.agencySlug === "string" && filters.agencySlug.trim().length > 0

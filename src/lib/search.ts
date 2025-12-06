@@ -78,6 +78,16 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       ? filters.agencyCode.trim()
       : undefined;
 
+  const sanitizedApplicantTypes = Array.isArray(filters.applicantTypes)
+    ? Array.from(
+        new Set(
+          filters.applicantTypes
+            .map((value) => value?.trim())
+            .filter((value): value is string => Boolean(value))
+        )
+      )
+    : [];
+
   const stateCode = normalizeStateCode(
     filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined,
   );
@@ -145,6 +155,7 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     stateCode,
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
+    applicantTypes: sanitizedApplicantTypes,
     page,
     pageSize,
     range: { from, to },
@@ -250,6 +261,13 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     if (agencyClauses.length > 0) {
       q = q.or(agencyClauses.join(","));
+    }
+
+    /** ------------------------------
+     * APPLICANT TYPES FILTER
+     * ------------------------------*/
+    if (sanitizedApplicantTypes.length > 0) {
+      q = q.overlaps("applicant_types", sanitizedApplicantTypes);
     }
 
     /** ------------------------------
@@ -601,6 +619,74 @@ export async function getFacetSets(): Promise<FacetSets> {
   }
 
   return f;
+}
+
+/** ------------------------------------------------------------------
+ * CATEGORY/STATE FACETS (FTHB filters)
+ * -----------------------------------------------------------------*/
+export async function getCategoryStateFacetOptions(
+  categoryCode: string,
+  stateCode?: string | null
+): Promise<{ applicantTypes: string[] }> {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) return { applicantTypes: [] };
+
+  const normalizedState = resolveStateQueryValue(stateCode ?? "");
+  const clauses: string[] = [];
+
+  const stateCandidates = new Set<string>();
+  if (normalizedState.code) {
+    stateCandidates.add(normalizedState.code);
+    for (const candidate of stateNameCandidatesFromCode(normalizedState.code)) {
+      stateCandidates.add(candidate);
+    }
+  } else if (normalizedState.value) {
+    stateCandidates.add(normalizedState.value);
+  }
+
+  for (const candidate of stateCandidates) {
+    clauses.push(`state.ilike.%${escapeIlike(candidate)}%`);
+  }
+
+  let query = supabase
+    .from("grants")
+    .select("applicant_types, state")
+    .eq("category_code", categoryCode)
+    .limit(2000);
+
+  if (clauses.length > 0) {
+    query = query.or(clauses.join(","));
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("❌ Facet load error (category/state)", error);
+    return { applicantTypes: [] };
+  }
+
+  const applicantSet = new Set<string>();
+  const genericApplicants = new Set(["homebuyer", "first-time homebuyer"]);
+
+  for (const entry of data ?? []) {
+    const applicants = Array.isArray(entry?.applicant_types)
+      ? entry.applicant_types
+      : [];
+
+    for (const value of applicants) {
+      const trimmed = typeof value === "string" ? value.trim() : "";
+      const normalized = trimmed.toLowerCase();
+
+      if (!trimmed || genericApplicants.has(normalized)) continue;
+      applicantSet.add(trimmed);
+    }
+  }
+
+  const sortAlpha = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" });
+
+  return {
+    applicantTypes: Array.from(applicantSet).sort(sortAlpha),
+  };
 }
 
 /** ------------------------------------------------------------------

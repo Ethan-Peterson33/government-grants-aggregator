@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/grants/breadcrumb";
+import { FthbFilterPanel } from "@/components/grants/fthb-filter-panel";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { categoryStateCopy } from "@/content/categoryStateCopy";
 import {
@@ -15,7 +16,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FilterOption } from "@/components/grants/filters-bar";
 import type { GrantFilters } from "@/lib/types";
 import { wordsFromSlug } from "@/lib/strings";
-import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
+import {
+  getCategoryStateFacetOptions,
+  getFacetSets,
+  safeNumber,
+  searchGrants,
+} from "@/lib/search";
 
 const PAGE_SIZE = 12;
 
@@ -182,6 +188,12 @@ export default async function CategoryStatePage({
   const agency = extractSearchParam(resolvedSearch, "agency");
   const hasApplyLink = extractSearchParam(resolvedSearch, "has_apply_link") === "1";
 
+  const applicantTypesParam = extractSearchParam(resolvedSearch, "applicant_types") ?? "";
+  const applicantTypes = applicantTypesParam
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
   const jurisdictionParam = extractSearchParam(resolvedSearch, "jurisdiction");
   const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local", "private"];
   const jurisdiction = allowedJurisdictions.includes(jurisdictionParam as GrantFilters["jurisdiction"])
@@ -198,9 +210,20 @@ export default async function CategoryStatePage({
     agency,
     hasApplyLink,
     jurisdiction,
+    applicantTypes: applicantTypes.length ? applicantTypes : undefined,
   };
 
-  const [{ grants, total, totalPages }, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
+  const isFthbCategory = context.category.slug === "first-time-homeowner";
+
+  const [{ grants, total, totalPages }, facets, fthbFacets] = await Promise.all(
+    [
+      searchGrants(filters),
+      getFacetSets(),
+      isFthbCategory
+        ? getCategoryStateFacetOptions(context.category.category_code, context.state.code)
+        : Promise.resolve({ applicantTypes: [] }),
+    ] as const
+  );
 
   const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
     label: `${item.label} (${item.grantCount})`,
@@ -295,6 +318,12 @@ export default async function CategoryStatePage({
       </header>
 
       <section id="category-state-list" className="space-y-6">
+        {isFthbCategory && (
+          <FthbFilterPanel
+            applicantTypes={fthbFacets.applicantTypes}
+          />
+        )}
+
         <GrantsSearchClient
           initialFilters={{
             query: query ?? "",

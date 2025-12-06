@@ -22,6 +22,10 @@ const DEFAULT_PAGE_SIZE = 12;
    Types
 ------------------------------------------ */
 
+type AdditionalFilters = {
+  applicantTypes: string[];
+};
+
 export type LockedAgency = {
   label: string;
   slug: string;
@@ -58,6 +62,13 @@ const normalizeFilters = (raw: Partial<FilterState>): NormalizedFilters => {
   };
 };
 
+const normalizeAdditionalFilters = (
+  raw?: Partial<AdditionalFilters>
+): AdditionalFilters => ({
+  applicantTypes:
+    raw?.applicantTypes?.map((value) => value.trim()).filter(Boolean) ?? [],
+});
+
 const applyLocked = (
   filters: NormalizedFilters,
   locked?: Partial<FilterState>
@@ -84,17 +95,42 @@ const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
   a.agency === b.agency &&
   a.hasApplyLink === b.hasApplyLink;
 
+const areAdditionalFiltersEqual = (a: AdditionalFilters, b: AdditionalFilters) =>
+  a.applicantTypes.length === b.applicantTypes.length &&
+  a.applicantTypes.every((value, idx) => value === b.applicantTypes[idx]);
+
+const parseAdditionalFilters = (sp: URLSearchParams): AdditionalFilters => {
+  const applicantParam = sp.get("applicant_types") ?? "";
+
+  const applicantTypes = applicantParam
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return normalizeAdditionalFilters({ applicantTypes });
+};
+
+const applyAdditionalFilters = (
+  params: URLSearchParams,
+  filters: AdditionalFilters
+) => {
+  if (filters.applicantTypes.length > 0) {
+    params.set("applicant_types", filters.applicantTypes.join(","));
+  }
+};
+
 const serializeFilters = (
   filters: NormalizedFilters,
   page: number,
   pageSize: number,
   opts?: {
-    additionalParams?: Record<string, string>;
+    additionalParams?: Record<string, string | string[]>;
     locked?: Partial<FilterState>;
+    additionalFilters?: AdditionalFilters;
   }
 ): URLSearchParams => {
   const p = new URLSearchParams();
-  const { additionalParams, locked } = opts ?? {};
+  const { additionalParams, locked, additionalFilters } = opts ?? {};
 
   if (filters.category) {
     p.set("category", filters.category);
@@ -108,9 +144,15 @@ const serializeFilters = (
   if (page > 1) p.set("page", String(page));
   if (pageSize !== DEFAULT_PAGE_SIZE) p.set("pageSize", String(pageSize));
 
+  if (additionalFilters) applyAdditionalFilters(p, additionalFilters);
+
   if (additionalParams) {
     for (const [k, v] of Object.entries(additionalParams)) {
-      if (v) p.set(k, v);
+      if (Array.isArray(v) && v.length > 0) {
+        p.set(k, v.join(","));
+      } else if (typeof v === "string" && v) {
+        p.set(k, v);
+      }
     }
   }
 
@@ -179,6 +221,7 @@ export function GrantsSearchClient({
         filters: mergeLocked(raw),
         page: Number(sp.get("page")) || 1,
         pageSize: Number(sp.get("pageSize")) || DEFAULT_PAGE_SIZE,
+        additionalFilters: parseAdditionalFilters(sp),
       };
     },
     [mergeLocked]
@@ -198,6 +241,10 @@ export function GrantsSearchClient({
       ...initialUrlState.filters,
     }),
     lockedFilterValues
+  );
+
+  const startingAdditionalFilters = normalizeAdditionalFilters(
+    initialUrlState.additionalFilters
   );
 
   const startingPage =
@@ -220,6 +267,9 @@ export function GrantsSearchClient({
   const [totalPages, setTotalPages] = useState(initialResults.totalPages ?? 0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [additionalFilters, setAdditionalFilters] = useState<AdditionalFilters>(
+    startingAdditionalFilters
+  );
 
   /* -----------------------------------------
      STATIC PARAMS
@@ -245,10 +295,16 @@ export function GrantsSearchClient({
      UPDATE URL
   ------------------------------------------ */
   const updateUrl = useCallback(
-    (f: NormalizedFilters, page: number, size: number) => {
+    (
+      f: NormalizedFilters,
+      page: number,
+      size: number,
+      extraFilters: AdditionalFilters
+    ) => {
       const sp = serializeFilters(f, page, size, {
         additionalParams,
         locked: lockedFilterValues,
+        additionalFilters: extraFilters,
       });
 
       router.replace(sp.toString() ? `${basePath}?${sp}` : basePath, {
@@ -266,14 +322,18 @@ export function GrantsSearchClient({
       nextFilters: NormalizedFilters,
       nextPage: number,
       nextPageSize?: number,
-      opts?: { skipUrl?: boolean }
+      opts?: { skipUrl?: boolean; additionalFilters?: AdditionalFilters }
     ) => {
       const size = nextPageSize ?? pageSize;
       const effective = mergeLocked(nextFilters);
+      const effectiveAdditional = normalizeAdditionalFilters(
+        opts?.additionalFilters ?? additionalFilters
+      );
 
-      if (!opts?.skipUrl) updateUrl(effective, nextPage, size);
+      if (!opts?.skipUrl) updateUrl(effective, nextPage, size, effectiveAdditional);
 
       setFilters(effective);
+      setAdditionalFilters(effectiveAdditional);
       setIsLoading(true);
       setError(null);
 
@@ -281,6 +341,7 @@ export function GrantsSearchClient({
         const sp = serializeFilters(effective, nextPage, size, {
           additionalParams,
           locked: lockedFilterValues,
+          additionalFilters: effectiveAdditional,
         });
 
         const res = await fetch(`/api/grants/search?${sp}`);
@@ -303,6 +364,7 @@ export function GrantsSearchClient({
     },
     [
       additionalParams,
+      additionalFilters,
       mergeLocked,
       pageSize,
       updateUrl,
@@ -319,13 +381,26 @@ export function GrantsSearchClient({
     const filtersChanged = !areFiltersEqual(parsed.filters, filters);
     const pageChanged =
       parsed.page !== page || parsed.pageSize !== pageSize;
+    const additionalChanged = !areAdditionalFiltersEqual(
+      parsed.additionalFilters,
+      additionalFilters
+    );
 
-    if (filtersChanged || pageChanged) {
+    if (filtersChanged || pageChanged || additionalChanged) {
       performSearch(parsed.filters, parsed.page, parsed.pageSize, {
         skipUrl: true,
+        additionalFilters: parsed.additionalFilters,
       });
     }
-  }, [filters, page, pageSize, parseUrl, performSearch, searchParams]);
+  }, [
+    filters,
+    page,
+    pageSize,
+    additionalFilters,
+    parseUrl,
+    performSearch,
+    searchParams,
+  ]);
 
   const effectiveFilters = useMemo(
     () => mergeLocked(filters),
@@ -343,11 +418,12 @@ export function GrantsSearchClient({
       if (effectiveFilters.agency) params.set("agency", effectiveFilters.agency);
       if (effectiveFilters.hasApplyLink) params.set("has_apply_link", "1");
       if (effectiveFilters.category) params.set("category", effectiveFilters.category);
+      applyAdditionalFilters(params, additionalFilters);
 
       const queryString = params.toString();
       return queryString ? `${basePath}?${queryString}` : basePath;
     },
-    [basePath, effectiveFilters]
+    [basePath, effectiveFilters, additionalFilters]
   );
 
   /* -----------------------------------------

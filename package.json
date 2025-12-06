@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node ./scripts/ci-build.js",
+    "ci-reinstall": "npm cache clean --force && rm -rf node_modules package-lock.json && npm install",
     "postbuild": "next-sitemap",
     "start": "next start",
     "dev": "next dev",

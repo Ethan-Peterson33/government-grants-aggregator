@@ -335,7 +335,7 @@ export default async function CategoryStatePage({
     : { applicantTypes: [], geographyScopes: [] };
 
   const searchData = !isFthbCategory ? await Promise.all([searchGrants(filters), getFacetSets()]) : null;
-  const [{ grants, total, totalPages } = { grants: [], total: 0, totalPages: 0 } as const, facets] =
+  const [{ grants, total, totalPages } = { grants: [] as Grant[], total: 0, totalPages: 0 }, facets] =
     searchData ?? [];
 
   const categoryOptions: FilterOption[] = facets

@@ -78,6 +78,16 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       ? filters.agencyCode.trim()
       : undefined;
 
+  const applicantTypes = Array.isArray(filters.applicantTypes)
+    ? filters.applicantTypes
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value))
+    : [];
+  const geographyScope =
+    typeof filters.geographyScope === "string" && filters.geographyScope.trim().length > 0
+      ? filters.geographyScope.trim()
+      : undefined;
+
   const stateCode = normalizeStateCode(
     filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined,
   );
@@ -149,6 +159,8 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     pageSize,
     range: { from, to },
     categoryCodes,
+    applicantTypes,
+    geographyScope,
   });
 
   /** ------------------------------------------------------------------
@@ -250,6 +262,21 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
 
     if (agencyClauses.length > 0) {
       q = q.or(agencyClauses.join(","));
+    }
+
+    /** ------------------------------
+     * APPLICANT TYPE FILTER
+     * ------------------------------*/
+    if (applicantTypes.length > 0) {
+      const formatted = `{${applicantTypes.join(",")}}`;
+      q = q.filter("applicant_types", "cs", formatted);
+    }
+
+    /** ------------------------------
+     * GEOGRAPHY SCOPE FILTER
+     * ------------------------------*/
+    if (geographyScope) {
+      q = q.eq("geography_scope", geographyScope);
     }
 
     /** ------------------------------
@@ -424,6 +451,21 @@ export function grantMatchesFilters(grant: Grant, filters: GrantFilters): boolea
 
   // Apply-link filter
   if (filters.hasApplyLink && !grant.apply_link) return false;
+
+  // Applicant type filter (overlap)
+  if (filters.applicantTypes && filters.applicantTypes.length > 0) {
+    const availableTypes = new Set((grant.applicant_types ?? []).map((value) => value?.toLowerCase().trim()));
+    const matchesApplicant = filters.applicantTypes.some((value) =>
+      availableTypes.has(value?.toLowerCase().trim())
+    );
+    if (!matchesApplicant) return false;
+  }
+
+  // Geography scope filter (exact match)
+  if (filters.geographyScope) {
+    const normalizedScope = toComparable(filters.geographyScope);
+    if (!normalizedScope || toComparable(grant.geography_scope) !== normalizedScope) return false;
+  }
 
   return true;
 }

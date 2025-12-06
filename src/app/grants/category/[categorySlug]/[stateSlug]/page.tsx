@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { Breadcrumb } from "@/components/grants/breadcrumb";
+import { CategoryStateFthbFilters } from "@/components/grants/category-state-fthb-filters";
+import { GrantCard } from "@/components/grants/grant-card";
 import { GrantsSearchClient } from "@/components/grants/grants-search-client";
 import { categoryStateCopy } from "@/content/categoryStateCopy";
 import {
@@ -10,14 +12,15 @@ import {
   extractSearchParam,
   type SearchParamsLike,
 } from "@/app/grants/_components/route-params";
-import { resolveStateParam } from "@/lib/grant-location";
+import { resolveStateParam, stateNameCandidatesFromCode } from "@/lib/grant-location";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { FilterOption } from "@/components/grants/filters-bar";
-import type { GrantFilters } from "@/lib/types";
+import type { Grant, GrantFilters } from "@/lib/types";
 import { wordsFromSlug } from "@/lib/strings";
 import { getFacetSets, safeNumber, searchGrants } from "@/lib/search";
 
 const PAGE_SIZE = 12;
+const FTHB_PAGE_SIZE = 100;
 
 
 type Params = { categorySlug: string; stateSlug: string };
@@ -61,6 +64,122 @@ async function loadContext(params: Params): Promise<PageContext | null> {
   }
 
   return { category, state: stateInfo, stateSlug: params.stateSlug };
+}
+
+function buildStateCandidates(stateCode: string, stateName: string) {
+  const candidates = new Set<string>([stateCode, stateName]);
+  for (const candidate of stateNameCandidatesFromCode(stateCode)) {
+    candidates.add(candidate);
+  }
+  return Array.from(candidates).filter(Boolean);
+}
+
+async function loadCategoryStateGrants(
+  category: CategoryRecord,
+  state: { code: string; name: string },
+  opts?: {
+    applicantTypes?: string[];
+    geographyScope?: string | null;
+  }
+) {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) return [];
+
+  const stateCandidates = buildStateCandidates(state.code, state.name);
+
+  let query = supabase
+    .from("grants")
+    .select("*")
+    .eq("category_code", category.category_code)
+    .in("state", stateCandidates)
+    .order("scraped_at", { ascending: false })
+    .limit(FTHB_PAGE_SIZE);
+
+  query = query.or("active.is.null,active.eq.true");
+
+  if (opts?.applicantTypes && opts.applicantTypes.length > 0) {
+    query = query.filter("applicant_types", "cs", `{${opts.applicantTypes.join(",")}}`);
+  }
+
+  if (opts?.geographyScope) {
+    query = query.eq("geography_scope", opts.geographyScope);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[category-state] Error loading grants", {
+      category: category.slug,
+      state: state.code,
+      error,
+    });
+    return [];
+  }
+
+  return (data ?? []) as Grant[];
+}
+
+async function loadApplicantAndGeographyFacets(
+  category: CategoryRecord,
+  state: { code: string; name: string }
+) {
+  const supabase = createServerSupabaseClient();
+  if (!supabase) {
+    return { applicantTypes: [], geographyScopes: [] };
+  }
+
+  const stateCandidates = buildStateCandidates(state.code, state.name);
+
+  let query = supabase
+    .from("grants")
+    .select("applicant_types, geography_scope")
+    .eq("category_code", category.category_code)
+    .in("state", stateCandidates);
+
+  query = query.or("active.is.null,active.eq.true");
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error("[category-state] Error loading facets", {
+      category: category.slug,
+      state: state.code,
+      error,
+    });
+    return { applicantTypes: [], geographyScopes: [] };
+  }
+
+  const EXCLUDED_APPLICANT_TYPES = new Set(["homebuyer", "first-time homebuyer"]);
+
+  const applicantTypeCounts = new Map<string, number>();
+  const geographyScopeCounts = new Map<string, number>();
+
+  for (const row of data) {
+    if (Array.isArray(row.applicant_types)) {
+      for (const raw of row.applicant_types) {
+        const key = String(raw ?? "").trim();
+        if (!key) continue;
+        if (EXCLUDED_APPLICANT_TYPES.has(key)) continue;
+
+        applicantTypeCounts.set(key, (applicantTypeCounts.get(key) ?? 0) + 1);
+      }
+    }
+
+    if (typeof row.geography_scope === "string") {
+      const key = row.geography_scope.trim();
+      if (!key) continue;
+      geographyScopeCounts.set(key, (geographyScopeCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  return {
+    applicantTypes: Array.from(applicantTypeCounts.entries())
+      .map(([value, count]) => ({ value, label: value, grantCount: count }))
+      .sort((a, b) => b.grantCount - a.grantCount || a.label.localeCompare(b.label)),
+    geographyScopes: Array.from(geographyScopeCounts.entries())
+      .map(([value, count]) => ({ value, label: value, grantCount: count }))
+      .sort((a, b) => b.grantCount - a.grantCount || a.label.localeCompare(b.label)),
+  };
 }
 
 function buildCopy(context: PageContext) {
@@ -172,6 +291,8 @@ export default async function CategoryStatePage({
   const context = await loadContext(resolvedParams);
   if (!context) return notFound();
 
+  const isFthbCategory = context.category.slug === "first-time-homeowner";
+
   const page = safeNumber(extractSearchParam(resolvedSearch, "page") ?? undefined, 1);
   const pageSize = Math.min(50, safeNumber(extractSearchParam(resolvedSearch, "pageSize") ?? undefined, PAGE_SIZE));
 
@@ -188,6 +309,15 @@ export default async function CategoryStatePage({
     ? (jurisdictionParam as GrantFilters["jurisdiction"])
     : undefined;
 
+  const applicantTypesParam = extractSearchParam(resolvedSearch, "applicant_types") ?? "";
+  const selectedApplicantTypes = applicantTypesParam
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  const selectedGeographyScopeRaw = extractSearchParam(resolvedSearch, "geography_scope") ?? "";
+  const selectedGeographyScope = selectedGeographyScopeRaw.trim() ? selectedGeographyScopeRaw.trim() : null;
+
   const filters: GrantFilters = {
     page,
     pageSize,
@@ -200,23 +330,39 @@ export default async function CategoryStatePage({
     jurisdiction,
   };
 
-  const [{ grants, total, totalPages }, facets] = await Promise.all([searchGrants(filters), getFacetSets()]);
+  const fthbFacets = isFthbCategory
+    ? await loadApplicantAndGeographyFacets(context.category, context.state)
+    : { applicantTypes: [], geographyScopes: [] };
 
-  const categoryOptions: FilterOption[] = facets.categories.map((item) => ({
-    label: `${item.label} (${item.grantCount})`,
-    value: item.slug,
-  }));
+  const searchData = !isFthbCategory ? await Promise.all([searchGrants(filters), getFacetSets()]) : null;
+  const [{ grants, total, totalPages } = { grants: [], total: 0, totalPages: 0 } as const, facets] =
+    searchData ?? [];
 
-  const stateOptions: FilterOption[] = [
-    { label: context.state.name, value: context.state.code },
-  ];
+  const categoryOptions: FilterOption[] = facets
+    ? facets.categories.map((item) => ({
+        label: `${item.label} (${item.grantCount})`,
+        value: item.slug,
+      }))
+    : [];
 
-  const agencyOptions: FilterOption[] = facets.agencies.map((facet) => ({
-    label: `${facet.label} (${facet.grantCount})`,
-    value: facet.value,
-  }));
+  const stateOptions: FilterOption[] = facets ? [{ label: context.state.name, value: context.state.code }] : [];
+
+  const agencyOptions: FilterOption[] = facets
+    ? facets.agencies.map((facet) => ({
+        label: `${facet.label} (${facet.grantCount})`,
+        value: facet.value,
+      }))
+    : [];
+
+  const fthbGrants = isFthbCategory
+    ? await loadCategoryStateGrants(context.category, context.state, {
+        applicantTypes: selectedApplicantTypes,
+        geographyScope: selectedGeographyScope,
+      })
+    : [];
 
   const { heading, intro, categoryLabel } = buildCopy(context);
+  const displayTotal = isFthbCategory ? fthbGrants.length : total;
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
@@ -287,38 +433,74 @@ export default async function CategoryStatePage({
 
           {/* Meta / trust line */}
           <p className="category-state-hero-fade-up text-xs font-medium uppercase tracking-wide text-slate-600 sm:text-sm [animation-delay:0.24s]">
-            {total > 0
-              ? `${total.toLocaleString()} active program${total === 1 ? "" : "s"} in ${context.state.name}`
+            {displayTotal > 0
+              ? `${displayTotal.toLocaleString()} active program${displayTotal === 1 ? "" : "s"} in ${context.state.name}`
               : `No active programs found yet in ${context.state.name} — new grants added weekly.`}
           </p>
         </div>
       </header>
 
       <section id="category-state-list" className="space-y-6">
-        <GrantsSearchClient
-          initialFilters={{
-            query: query ?? "",
-            category: context.category.slug,
-            state: context.state.code,
-            agency: agency ?? "",
-            hasApplyLink,
-            page,
-            pageSize,
-          }}
-          initialResults={{ grants, total, page, pageSize, totalPages }}
-          categories={categoryOptions}
-          states={stateOptions}
-          agencies={agencyOptions}
-          lockedFilters={{
-            category: context.category.slug,
-            state: context.state.code,
-          }}
-          staticParams={{
-            categorySlug: context.category.slug,
-            stateSlug: context.stateSlug,
-          }}
-          showStateFilter={false}
-        />
+        {isFthbCategory ? (
+          <div className="space-y-6">
+            <CategoryStateFthbFilters
+              applicantTypeFacets={fthbFacets.applicantTypes}
+              geographyScopeFacets={fthbFacets.geographyScopes}
+              initialValue={{
+                applicantTypes: selectedApplicantTypes,
+                geographyScope: selectedGeographyScope,
+              }}
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-600">
+                {fthbGrants.length > 0
+                  ? `${fthbGrants.length} grant${fthbGrants.length === 1 ? "" : "s"} available`
+                  : "No grants found for this category and state combination yet."}
+              </p>
+            </div>
+
+            {fthbGrants.length > 0 ? (
+              <div className="grid gap-4">
+                {fthbGrants.map((grant) => (
+                  <GrantCard key={grant.id} grant={grant} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-slate-700">
+                <p>
+                  We couldn&apos;t find any active grants for this category in {context.state.name} yet. Try exploring statewide
+                  grants or a different focus area.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <GrantsSearchClient
+            initialFilters={{
+              query: query ?? "",
+              category: context.category.slug,
+              state: context.state.code,
+              agency: agency ?? "",
+              hasApplyLink,
+              page,
+              pageSize,
+            }}
+            initialResults={{ grants, total, page, pageSize, totalPages }}
+            categories={categoryOptions}
+            states={stateOptions}
+            agencies={agencyOptions}
+            lockedFilters={{
+              category: context.category.slug,
+              state: context.state.code,
+            }}
+            staticParams={{
+              categorySlug: context.category.slug,
+              stateSlug: context.stateSlug,
+            }}
+            showStateFilter={false}
+          />
+        )}
       </section>
     </div>
   );

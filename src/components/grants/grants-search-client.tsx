@@ -24,7 +24,6 @@ const DEFAULT_PAGE_SIZE = 12;
 
 type AdditionalFilters = {
   applicantTypes: string[];
-  geographyScope: string;
 };
 
 export type LockedAgency = {
@@ -68,7 +67,6 @@ const normalizeAdditionalFilters = (
 ): AdditionalFilters => ({
   applicantTypes:
     raw?.applicantTypes?.map((value) => value.trim()).filter(Boolean) ?? [],
-  geographyScope: raw?.geographyScope?.trim() ?? "",
 });
 
 const applyLocked = (
@@ -98,20 +96,18 @@ const areFiltersEqual = (a: NormalizedFilters, b: NormalizedFilters) =>
   a.hasApplyLink === b.hasApplyLink;
 
 const areAdditionalFiltersEqual = (a: AdditionalFilters, b: AdditionalFilters) =>
-  a.geographyScope === b.geographyScope &&
   a.applicantTypes.length === b.applicantTypes.length &&
   a.applicantTypes.every((value, idx) => value === b.applicantTypes[idx]);
 
 const parseAdditionalFilters = (sp: URLSearchParams): AdditionalFilters => {
   const applicantParam = sp.get("applicant_types") ?? "";
-  const geographyScope = sp.get("geography_scope") ?? "";
 
   const applicantTypes = applicantParam
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
-  return normalizeAdditionalFilters({ applicantTypes, geographyScope });
+  return normalizeAdditionalFilters({ applicantTypes });
 };
 
 const applyAdditionalFilters = (
@@ -120,10 +116,6 @@ const applyAdditionalFilters = (
 ) => {
   if (filters.applicantTypes.length > 0) {
     params.set("applicant_types", filters.applicantTypes.join(","));
-  }
-
-  if (filters.geographyScope) {
-    params.set("geography_scope", filters.geographyScope);
   }
 };
 

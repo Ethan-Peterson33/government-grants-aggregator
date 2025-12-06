@@ -96,7 +96,6 @@ export type GrantFilters = {
   hasApplyLink?: boolean;
   jurisdiction?: GrantJurisdiction;
   applicantTypes?: string[];
-  geographyScope?: string;
   page?: number;
   pageSize?: number;
 };

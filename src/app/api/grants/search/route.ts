@@ -39,7 +39,6 @@ export async function GET(request: Request) {
         .map((value) => value.trim())
         .filter(Boolean)
     : undefined;
-  const geographyScope = searchParams.get("geography_scope") ?? undefined;
 
   const page = parseNumber(searchParams.get("page"), 1, { min: 1 });
   const pageSize = parseNumber(searchParams.get("pageSize"), DEFAULT_PAGE_SIZE, { min: 1, max: 50 });
@@ -56,7 +55,6 @@ export async function GET(request: Request) {
     jurisdiction,
     hasApplyLink,
     applicantTypes,
-    geographyScope,
     page,
     pageSize,
   };

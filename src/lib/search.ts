@@ -88,11 +88,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
       )
     : [];
 
-  const sanitizedGeographyScope =
-    typeof filters.geographyScope === "string" && filters.geographyScope.trim().length > 0
-      ? filters.geographyScope.trim()
-      : undefined;
-
   const stateCode = normalizeStateCode(
     filters.stateCode ?? normalizedState.code ?? normalizedState.value ?? undefined,
   );
@@ -161,7 +156,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
     jurisdiction: jurisdiction ?? "all",
     hasApplyLink,
     applicantTypes: sanitizedApplicantTypes,
-    geographyScope: sanitizedGeographyScope,
     page,
     pageSize,
     range: { from, to },
@@ -274,13 +268,6 @@ export async function searchGrants(filters: GrantFilters = {}): Promise<SearchRe
      * ------------------------------*/
     if (sanitizedApplicantTypes.length > 0) {
       q = q.overlaps("applicant_types", sanitizedApplicantTypes);
-    }
-
-    /** ------------------------------
-     * GEOGRAPHY SCOPE FILTER
-     * ------------------------------*/
-    if (sanitizedGeographyScope) {
-      q = q.ilike("geography_scope", sanitizedGeographyScope);
     }
 
     /** ------------------------------
@@ -640,9 +627,9 @@ export async function getFacetSets(): Promise<FacetSets> {
 export async function getCategoryStateFacetOptions(
   categoryCode: string,
   stateCode?: string | null
-): Promise<{ applicantTypes: string[]; geographyScopes: string[] }> {
+): Promise<{ applicantTypes: string[] }> {
   const supabase = createServerSupabaseClient();
-  if (!supabase) return { applicantTypes: [], geographyScopes: [] };
+  if (!supabase) return { applicantTypes: [] };
 
   const normalizedState = resolveStateQueryValue(stateCode ?? "");
   const clauses: string[] = [];
@@ -663,7 +650,7 @@ export async function getCategoryStateFacetOptions(
 
   let query = supabase
     .from("grants")
-    .select("applicant_types, geography_scope, state")
+    .select("applicant_types, state")
     .eq("category_code", categoryCode)
     .limit(2000);
 
@@ -674,11 +661,10 @@ export async function getCategoryStateFacetOptions(
   const { data, error } = await query;
   if (error) {
     console.error("❌ Facet load error (category/state)", error);
-    return { applicantTypes: [], geographyScopes: [] };
+    return { applicantTypes: [] };
   }
 
   const applicantSet = new Set<string>();
-  const geographySet = new Set<string>();
   const genericApplicants = new Set(["homebuyer", "first-time homebuyer"]);
 
   for (const entry of data ?? []) {
@@ -693,12 +679,6 @@ export async function getCategoryStateFacetOptions(
       if (!trimmed || genericApplicants.has(normalized)) continue;
       applicantSet.add(trimmed);
     }
-
-    const geography = typeof entry?.geography_scope === "string"
-      ? entry.geography_scope.trim()
-      : "";
-
-    if (geography) geographySet.add(geography);
   }
 
   const sortAlpha = (a: string, b: string) =>
@@ -706,7 +686,6 @@ export async function getCategoryStateFacetOptions(
 
   return {
     applicantTypes: Array.from(applicantSet).sort(sortAlpha),
-    geographyScopes: Array.from(geographySet).sort(sortAlpha),
   };
 }
 

@@ -194,8 +194,6 @@ export default async function CategoryStatePage({
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
 
-  const geographyScope = extractSearchParam(resolvedSearch, "geography_scope") ?? "";
-
   const jurisdictionParam = extractSearchParam(resolvedSearch, "jurisdiction");
   const allowedJurisdictions: GrantFilters["jurisdiction"][] = ["federal", "state", "local", "private"];
   const jurisdiction = allowedJurisdictions.includes(jurisdictionParam as GrantFilters["jurisdiction"])
@@ -213,7 +211,6 @@ export default async function CategoryStatePage({
     hasApplyLink,
     jurisdiction,
     applicantTypes: applicantTypes.length ? applicantTypes : undefined,
-    geographyScope: geographyScope || undefined,
   };
 
   const isFthbCategory = context.category.slug === "first-time-homeowner";
@@ -224,7 +221,7 @@ export default async function CategoryStatePage({
       getFacetSets(),
       isFthbCategory
         ? getCategoryStateFacetOptions(context.category.category_code, context.state.code)
-        : Promise.resolve({ applicantTypes: [], geographyScopes: [] }),
+        : Promise.resolve({ applicantTypes: [] }),
     ] as const
   );
 
@@ -324,7 +321,6 @@ export default async function CategoryStatePage({
         {isFthbCategory && (
           <FthbFilterPanel
             applicantTypes={fthbFacets.applicantTypes}
-            geographyScopes={fthbFacets.geographyScopes}
           />
         )}
 
